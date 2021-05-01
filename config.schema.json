@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "DaikinOnePlus",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -9,8 +9,19 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
+        "default": "Daikin One+"
+      },
+      "user": {
+        "title": "Daikin Username",
+        "type": "string",
+        "required": true
+      },
+      "password": {
+        "title": "Daikin Password",
+        "type": "string",
+        "required": true
       }
+
     }
   }
 }

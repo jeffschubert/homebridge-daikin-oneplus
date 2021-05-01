@@ -1,16 +1,16 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
+  "displayName": "Daikin One+",
+  "name": "homebridge-daikin-oneplus",
   "version": "1.0.0",
-  "description": "A short description about what your plugin does.",
+  "description": "Control a Daikin One+ thermostat.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "git://github.com/jeffschubert/homebridge-daikin-oneplus.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/jeffschubert/homebridge-daikin-oneplus/issues"
   },
   "engines": {
     "node": ">=10.17.0",
@@ -26,7 +26,6 @@
   "keywords": [
     "homebridge-plugin"
   ],
-  "dependencies": {},
   "devDependencies": {
     "@types/node": "^14.0.27",
     "@typescript-eslint/eslint-plugin": "^3.9.0",
@@ -37,5 +36,8 @@
     "rimraf": "^3.0.2",
     "ts-node": "^8.10.2",
     "typescript": "^3.9.7"
+  },
+  "dependencies": {
+    "axios": "^0.21.1"
   }
 }

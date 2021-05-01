@@ -1,151 +1,188 @@
-import { Service, PlatformAccessory, CharacteristicValue, CharacteristicSetCallback, CharacteristicGetCallback } from 'homebridge';
+import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
+import { DaikinApi } from './daikinapi';
 
-import { ExampleHomebridgePlatform } from './platform';
+import { DaikinOnePlusPlatform } from './platform';
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class ExamplePlatformAccessory {
+export class DaikinOnePlusAccessory {
   private service: Service;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  }
-
   constructor(
-    private readonly platform: ExampleHomebridgePlatform,
+    private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly deviceId: string,
+    private readonly daikinApi: DaikinApi,
   ) {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Daikin')
+      .setCharacteristic(this.platform.Characteristic.Model, accessory.context.device.model)
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.id);
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
+    this.service = this.accessory.getService(this.platform.Service.Thermostat) 
+                    || this.accessory.addService(this.platform.Service.Thermostat);
 
     // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
+    // create handlers for required characteristics
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState)
+      .onGet(this.handleCurrentHeatingCoolingStateGet.bind(this));
 
-    // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .on('set', this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .on('get', this.getOn.bind(this));               // GET - bind to the `getOn` method below
+    this.service.getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
+      .onGet(this.handleTargetHeatingCoolingStateGet.bind(this))
+      .onSet(this.handleTargetHeatingCoolingStateSet.bind(this));
 
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .on('set', this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+      .onGet(this.handleCurrentTemperatureGet.bind(this));
 
+    this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
+      .onGet(this.handleTargetTemperatureGet.bind(this))
+      .onSet(this.handleTargetTemperatureSet.bind(this));
 
-    /**
-     * Creating multiple services of the same type.
-     * 
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     * 
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same sub type id.)
-     */
+    this.service.getCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits)
+      .onGet(this.handleTemperatureDisplayUnitsGet.bind(this))
+      .onSet(this.handleTemperatureDisplayUnitsSet.bind(this));
 
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-    /**
-     * Updating characteristics values asynchronously.
-     * 
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     * 
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
-
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
   }
 
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
+   * Handle requests to get the current value of the "Current Heating Cooling State" characteristic
    */
-  setOn(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
-
-    this.platform.log.debug('Set Characteristic On ->', value);
-
-    // you must call the callback function
-    callback(null);
+  async handleCurrentHeatingCoolingStateGet(): Promise<CharacteristicValue> {
+    this.platform.log.debug('Triggered GET CurrentHeatingCoolingState');
+    const currentStatus = await this.daikinApi.getCurrentStatus(this.deviceId);
+    //"equipmentStatus": the running state of the system, 1=cooling, 2=overcool dehumidifying, 3=heating, 4=fan, 5=idle, 
+    // set this to a valid value for CurrentHeatingCoolingState
+    let currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.OFF;
+    switch(currentStatus){
+      case 1:
+        currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.COOL;
+        break;
+      case 3:
+        currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
+        break;
+    }
+    return currentValue;
   }
-
+  
+  
   /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   * 
-   * GET requests should return as fast as possbile. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   * 
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
+   * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
    */
-  getOn(callback: CharacteristicGetCallback) {
-
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
-
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // you must call the callback function
-    // the first argument should be null if there were no errors
-    // the second argument should be the value to return
-    callback(null, isOn);
+  async handleTargetHeatingCoolingStateGet(): Promise<CharacteristicValue> {
+    this.platform.log.debug('Triggered GET TargetHeatingCoolingState');
+    //“mode”: 2 is cool, 3 is auto, 1 is heat, 0 is off, emergency heat is 4
+  
+    // set this to a valid value for TargetHeatingCoolingState
+    let currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
+    const currentStatus = await this.daikinApi.getTargetState(this.deviceId);
+    // set this to a valid value for CurrentHeatingCoolingState
+    switch(currentStatus){
+      case 1:
+      case 4:
+        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.HEAT;
+        break;
+      case 2:
+        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.COOL;
+        break;
+      case 3:
+        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.AUTO;
+        break;
+    }
+  
+    return currentValue;
   }
-
+  
   /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
+   * Handle requests to set the "Target Heating Cooling State" characteristic
    */
-  setBrightness(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
-
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
-
-    // you must call the callback function
-    callback(null);
+  async handleTargetHeatingCoolingStateSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET TargetHeatingCoolingState:', value);
+    
+    //“mode”: 2 is cool, 3 is auto, 1 is heat, 0 is off, emergency heat is 4
+  
+    // set this to a valid value for TargetHeatingCoolingState
+    let requestedState = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
+    // set this to a valid value for CurrentHeatingCoolingState
+    switch(value){
+      case this.platform.Characteristic.TargetHeatingCoolingState.HEAT:
+        requestedState = 1;
+        break;
+      case this.platform.Characteristic.TargetHeatingCoolingState.COOL:
+        requestedState = 2;
+        break;
+      case this.platform.Characteristic.TargetHeatingCoolingState.AUTO:
+        requestedState = 3;
+        break;
+    }
+  
+    this.daikinApi.setTargetState(this.deviceId, requestedState);
   }
-
+  
+  /**
+   * Handle requests to get the current value of the "Current Temperature" characteristic
+   */
+  async handleCurrentTemperatureGet(): Promise<CharacteristicValue> {
+    this.platform.log.debug('Triggered GET CurrentTemperature');
+  
+    let currentTemp = await this.daikinApi.getCurrentTemp(this.deviceId);
+    // set this to a valid value for CurrentTemperature
+    if(currentTemp < -270) {
+      currentTemp = -270;
+    } else if (currentTemp > 100) {
+      currentTemp = 100;
+    }
+    return currentTemp;
+  }
+  
+  
+  /**
+   * Handle requests to get the current value of the "Target Temperature" characteristic
+   */
+  async handleTargetTemperatureGet(): Promise<CharacteristicValue> {
+    this.platform.log.debug('Triggered GET TargetTemperature');
+  
+    //TODO: Need to get whether cooling or heating to request correct target temp
+    let currentTemp = await this.daikinApi.getTargetTemp(this.deviceId);
+    // set this to a valid value for CurrentTemperature
+    if(currentTemp < -270) {
+      currentTemp = -270;
+    } else if (currentTemp > 100) {
+      currentTemp = 100;
+    }
+    return currentTemp;
+  }
+  
+  /**
+   * Handle requests to set the "Target Temperature" characteristic
+   */
+  async handleTargetTemperatureSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET TargetTemperature:', value);
+  }
+  
+  /**
+   * Handle requests to get the current value of the "Temperature Display Units" characteristic
+   */
+  async handleTemperatureDisplayUnitsGet(): Promise<CharacteristicValue> {
+    this.platform.log.debug('Triggered GET TemperatureDisplayUnits');
+  
+    // set this to a valid value for TemperatureDisplayUnits
+    const currentValue = this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS;
+  
+    return currentValue;
+  }
+  
+  /**
+   * Handle requests to set the "Temperature Display Units" characteristic
+   */
+  async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
+    this.platform.log.debug('Triggered SET TemperatureDisplayUnits:', value);
+  }
 }
