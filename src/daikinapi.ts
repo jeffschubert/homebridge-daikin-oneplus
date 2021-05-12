@@ -21,9 +21,8 @@ export class DaikinApi{
         .then(()=>this.getLocation())
         .then(()=>this.getDevices())
         .then(()=>{
-          console.log(this._locations);
-          console.log(this._devices);
-          //console.log(this._deviceData);
+          this.platform.log.debug(this._locations);
+          this.platform.log.debug(this._devices);
         });
 
     }
@@ -79,7 +78,7 @@ export class DaikinApi{
 
     getRequest(uri: string){
       if(new Date() >= this._tokenExpiration){
-        console.log('Refreshing token.');
+        this.platform.log.info('Refreshing token.');
         this.refreshToken();
       }
       return axios.get(uri, {
@@ -96,46 +95,142 @@ export class DaikinApi{
       return this._devices;
     }
 
-    async getCurrentStatus(deviceId: string): Promise<number> {
-      return this.getDeviceData(deviceId).then((response)=>{
-        return response.equipmentStatus;
-      });
+    getCurrentStatus(deviceData: any): number {
+      return deviceData.equipmentStatus;
     }
 
-    async getCurrentTemp(deviceId: string): Promise<number> {
-      return this.getDeviceData(deviceId).then((response)=>{
-        return response.tempIndoor;
-      });
+    getCurrentTemp(deviceData: any): number {
+      return deviceData.tempIndoor;
     }
 
-    async getTargetState(deviceId: string): Promise<number> {
-      return this.getDeviceData(deviceId).then((response)=>{
-        return response.mode;
-      });
+    getTargetState(deviceData: any): number {
+      return deviceData.mode;
     }
 
-    async setTargetState(deviceId: string, requestedState: number){
-      this.platform.log.debug(`Setting target state ${requestedState} for device ${deviceId}`);
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, {
-        'equipmentStatus': requestedState,
-      }, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + this._token.accessToken,
-        },
-      })
+    getTargetTemp(deviceData: any): number {
+      this.platform.log.debug('GET TargetTemp');
+      switch(deviceData.mode){
+        case 1: //heat
+        case 4: //emrg heat
+          return deviceData.hspActive;
+        case 2: //cool
+        case 3: //auto
+        default:
+          return deviceData.cspActive;
+      }
+    }
+
+    getCurrentHumidity(deviceData: any): number {
+      return deviceData.humIndoor;
+    }
+
+    getTargetHumidity(deviceData: any): number {
+      return deviceData.humSP;
+    }
+
+    getDisplayUnits(deviceData: any): number {
+      return deviceData.units;
+    }
+
+    async setTargetTemp(deviceId: string, deviceData: any, requestedTemp: number): Promise<boolean>{
+      this.platform.log.debug(`setTargetTemp-> device:${deviceId}; temp:${requestedTemp}`);
+      let requestedData = {};
+      switch(deviceData.mode){
+        case 1: //heat
+          requestedData = {hspHome: requestedTemp};
+          break;
+        case 2: //cool
+        case 3: //auto
+          requestedData = {cspHome: requestedTemp};
+          break;
+        case 4: //emrg heat
+          this.platform.log.info('Device is in Emergency Heat. Unable to set target temp.');
+          return false;
+        default:
+          this.platform.log.info(`Device is in an unknown state: ${deviceData.mode}. Unable to set target temp.`);
+          return false;
+      }
+      this.platform.log.debug('setTargetTemp-> requestedData: ', requestedData);
+      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
         .then(res => {
-          this.platform.log.debug(`response: ${res.data}`);
+          this.platform.log.debug('setTargetTemp-> response: ', res.data);
+        })
+        .catch(error => {
+          this.platform.log.error(`Error updating target temp: ${error}`);
+          return false;
+        });
+      return true;
+    }
+
+    async setTargetState(deviceId: string, deviceData: any, requestedState: number): Promise<boolean>{
+      this.platform.log.debug(`setTargetState-> device:${deviceId}; state:${requestedState}`);
+      const requestedData = {mode: requestedState};
+
+      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
+        .then(res => {
+          this.platform.log.debug('setTargetState-> response: ', res.data);
         })
         .catch(error => {
           this.platform.log.error(`Error updating target state: ${error}`);
+          return false;
         });
+      return true;
+    }
+
+    async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{
+      this.platform.log.debug(`setDisplayUnits-> device:${deviceId}; units:${requestedUnits}`);
+      const requestedData = {units: requestedUnits};
+
+      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
+        .then(res => {
+          this.platform.log.debug('setDisplayUnits-> response: ', res.data);
+        })
+        .catch(error => {
+          this.platform.log.error(`Error updating target state: ${error}`);
+          return false;
+        });
+      return true;
+    }
+
+    async setTargetHumidity(deviceId: string, requestedHumidity: number) : Promise<boolean>{
+      this.platform.log.debug(`setTargetHumidity-> device:${deviceId}; humidity:${requestedHumidity}`);
+      const requestedData = {humSP: requestedHumidity};
+      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
+        .then(res => {
+          this.platform.log.debug('setTargetState-> response: ', res.data);
+        })
+        .catch(error => {
+          this.platform.log.error(`Error updating target humidity: ${error}`);
+          return false;
+        });
+      return true;
     }
 }
-
-/*const api = new DaikinApi('daikin@jhfamily.net', 'yHC7CX$9TP6A');
-api.Initialize().then(()=>{
-  return api.getTargetStatus('ac230f4c-d900-11ea-b7e2-9bb9e77f74dd');
-}).then((response)=>console.log('Status: ', response));
-*/
