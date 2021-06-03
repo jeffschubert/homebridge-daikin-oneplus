@@ -1,5 +1,4 @@
 import { Service, PlatformAccessory, CharacteristicValue, CharacteristicEventTypes } from 'homebridge';
-import { maxHeaderSize } from 'http';
 import { DaikinApi } from './daikinapi';
 
 import { DaikinOnePlusPlatform } from './platform';
@@ -9,10 +8,10 @@ import { DaikinOnePlusPlatform } from './platform';
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class DaikinOnePlusAccessory {
+export class DaikinOnePlusThermostat {
   private service: Service;
   private deviceData;
-
+  
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory,
@@ -32,7 +31,7 @@ export class DaikinOnePlusAccessory {
                     || this.accessory.addService(this.platform.Service.Thermostat);
 
     // set the service name, this is what is displayed as the default name on the Home app
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
     
     this.service.getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
       .on(CharacteristicEventTypes.SET, this.handleTargetHeatingCoolingStateSet.bind(this));
@@ -67,7 +66,7 @@ export class DaikinOnePlusAccessory {
         this.handleTargetHumidityGet(this.deviceData));
 
       this.platform.log.debug('Updated values...');
-    }, 10000);
+    }, this.platform.config.refreshInterval*1000);
   }
 
   /**

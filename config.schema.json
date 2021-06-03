@@ -2,6 +2,8 @@
   "pluginAlias": "DaikinOnePlus",
   "pluginType": "platform",
   "singular": true,
+  "headerDisplay": "All devices associated with the configured Daikin account will be loaded as accessories.",
+  "footerDisplay": "You must have a Daikin One+ Smart Thermostat and cloud account for this to work.",
   "schema": {
     "type": "object",
     "properties": {
@@ -20,8 +22,22 @@
         "title": "Daikin Password",
         "type": "string",
         "required": true
+      },
+      "refreshInterval": {
+        "title": "Refresh interval (seconds)",
+        "type": "integer",
+        "default": 10,
+        "minimum": 1,
+        "maximum": 60,
+        "required": true
+      },
+      "includeDeviceName": {
+        "title": "Include Device Name",
+        "description": "Include device name as part of the default sensor name.",
+        "type": "boolean",
+        "default": false,
+        "required": true
       }
-
     }
   }
 }

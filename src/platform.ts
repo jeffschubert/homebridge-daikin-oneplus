@@ -1,7 +1,9 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { DaikinOnePlusAccessory } from './platformAccessory';
+import { DaikinOnePlusThermostat } from './platformThermostat';
+import { DaikinOnePlusAQSensor } from './platformAQI';
+import { DaikinOnePlusHumidity } from './platformHumidity';
 import { DaikinApi } from './daikinapi';
 
 /**
@@ -16,13 +18,35 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   private readonly daikinApi: DaikinApi;
+  
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
+    let credSet = true;
+    if(!this.config.name) {
+      this.log.error('Daikin Username not set.');
+      credSet = false;
+    }
+    if(!this.config.password){
+      this.log.error('Daikin password not set.');
+      credSet = false;
+    }
+    if(!this.config.refreshInterval){
+      this.config.refreshInterval = 10;
+      this.log.warn('Refresh Interval not set. Using default of 10 seconds.');
+    }
+    if(this.config.includeDeviceName === undefined) {
+      this.config.includeDeviceName = false;
+      this.log.warn('Include Device Name not set. Using default of false.');
+    }
+
     this.log.debug('Finished initializing platform:', this.config.name);
     this.daikinApi = new DaikinApi(this.config.user!, this.config.password!, this);
+    if(!credSet) {
+      return;
+    }
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
@@ -57,50 +81,122 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     // loop over the discovered devices and register each one if it has not already been registered
     for (const device of devices) {
+      this.log.info(`Found device: ${device.id}::${device.name}`);
+      const deviceData = await this.daikinApi.getDeviceData(device.id);
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.id);
+      //Check if a thermostat accessory exists from before air quality and other accessories were also supported.
+      let uuid = this.api.hap.uuid.generate(`${device.id}`);
+      this.log.info('Checking for legacy thermostat... ', {uuid});
+      let existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      if(existingAccessory){
+        this.log.info('Removing legacy thermostat from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+      }
 
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
+      uuid = this.api.hap.uuid.generate(`${device.id}_tstat`);
+      this.log.info('Checking for thermostat...', {uuid});
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      let dName = this.config.includeDeviceName ? `${device.name} Thermostat` : 'Thermostat';
       if (existingAccessory) {
         // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
-
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new DaikinOnePlusAccessory(this, existingAccessory, device.id, this.daikinApi);
-
+        existingAccessory.displayName = dName;
+        this.log.info('Restoring existing thermostat from cache:', existingAccessory.displayName);
+        new DaikinOnePlusThermostat(this, existingAccessory, device.id, this.daikinApi);
       } else {
         // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.name);
+        this.log.info('Adding new thermostat:', dName);
 
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.name, uuid);
-
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
+        const accessory = new this.api.platformAccessory(dName, uuid);
         accessory.context.device = device;
-
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new DaikinOnePlusAccessory(this, accessory, device.id, this.daikinApi);
-
-        // link the accessory to your platform
+        new DaikinOnePlusThermostat(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
 
-      // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-      // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-    }
+      uuid = this.api.hap.uuid.generate(`${device.id}_ohum`);
+      this.log.info('Checking for outdoor humidity sensor...', uuid);
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      dName = this.config.includeDeviceName ? `${device.name} Outdoor Humidity` : 'Outdoor Humidity';
+      if (existingAccessory) {
+        // the accessory already exists
+        existingAccessory.displayName = dName;
+        this.log.info('Restoring existing outdoor humidity sensor from cache:', existingAccessory.displayName);
+        new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, false);
+      } else {
+        // the accessory does not yet exist, so we need to create it
+        this.log.info('Adding new outdoor humidity sensor:', dName);
 
+        const accessory = new this.api.platformAccessory(dName, uuid);
+        accessory.context.device = device;
+        new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, false);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+
+      uuid = this.api.hap.uuid.generate(`${device.id}_ihum`);
+      this.log.info('Checking for indoor humidity sensor...', uuid);
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      dName = this.config.includeDeviceName ? `${device.name} Indoor Humidity` : 'Indoor Humidity';
+      if (existingAccessory) {
+        // the accessory already exists
+        existingAccessory.displayName = dName;
+        this.log.info('Restoring existing indoor humidity sensor from cache:', existingAccessory.displayName);
+        new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, true);
+      } else {
+        // the accessory does not yet exist, so we need to create it
+        this.log.info('Adding new indoor humidity sensor:', dName);
+
+        const accessory = new this.api.platformAccessory(dName, uuid);
+        accessory.context.device = device;
+        new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, true);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+
+      uuid = this.api.hap.uuid.generate(`${device.id}_oaqi`);
+      this.log.info('Checking for outdoor Air Quality sensor...', uuid);
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      dName = this.config.includeDeviceName ? `${device.name} Outdoor AQI` : 'Outdoor AQI';
+      if(deviceData.aqOutdoorAvailable){
+        if (existingAccessory) {
+          // the accessory already exists
+          existingAccessory.displayName = dName;
+          this.log.info('Restoring existing outdoor Air Quality sensor from cache:', existingAccessory.displayName);
+          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, false, dName);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new outdoor Air Quality sensor:', dName);
+
+          const accessory = new this.api.platformAccessory(dName, uuid);
+          accessory.context.device = device;
+          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, false, dName);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      } else if(existingAccessory){
+        this.log.info('Removing legacy outdoor Air Quality Sensor from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+      }
+
+      uuid = this.api.hap.uuid.generate(`${device.id}_iaqi`);
+      this.log.info('Checking for indoor Air Quality sensor...', uuid);
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      dName = this.config.includeDeviceName ? `${device.name} Indoor AQI` : 'Indoor AQI';
+      if(deviceData.aqIndoorAvailable){
+        if (existingAccessory) {
+          // the accessory already exists
+          existingAccessory.displayName = dName;
+          this.log.info('Restoring existing indoor Air Quality sensor from cache:', existingAccessory.displayName);
+          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, true, dName);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new indoor Air Quality sensor:', dName);
+
+          const accessory = new this.api.platformAccessory(dName, uuid);
+          accessory.context.device = device;
+          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, true, dName);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      } else if(existingAccessory){
+        this.log.info('Removing legacy indoor Air Quality Sensor from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+      }
+    }
   }
 }

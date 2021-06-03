@@ -95,6 +95,19 @@ export class DaikinApi{
       return this._devices;
     }
 
+    getDeviceName(deviceName: number, deviceNameCustom: string): string {
+      switch(deviceName){
+        case 0: return deviceNameCustom;
+        case 1: return 'main room';
+        case 2: return 'upstairs';
+        case 3: return 'downstairs';
+        case 4: return 'hallway';
+        case 5: return 'bedroom';
+        case 6: return 'kitchen';
+        default: return 'other';
+      }
+    }
+    
     getCurrentStatus(deviceData: any): number {
       return deviceData.equipmentStatus;
     }
@@ -124,8 +137,32 @@ export class DaikinApi{
       return deviceData.humIndoor;
     }
 
+    getOutdoorHumidity(deviceData: any): number {
+      return deviceData.humOutdoor;
+    }
+
     getTargetHumidity(deviceData: any): number {
       return deviceData.humSP;
+    }
+
+    getAirQualityLevel(deviceData: any, forIndoor:boolean): number {
+      return forIndoor ? deviceData.aqIndoorLevel : deviceData.aqOutdoorLevel;
+    }
+
+    getOzone(deviceData: any, forIndoor:boolean): number {
+      return forIndoor ? 0 : deviceData.aqOutdoorOzone;
+    }
+
+    getAirQualityValue(deviceData: any, forIndoor:boolean): number {
+      return forIndoor ? deviceData.aqIndoorValue : deviceData.aqOutdoorValue;
+    }
+
+    getPM2_5Density(deviceData: any, forIndoor:boolean): number {
+      return forIndoor ? deviceData.aqIndoorParticlesValue : deviceData.aqOutdoorParticles;
+    }
+
+    getVocDensity(deviceData: any, forIndoor:boolean): number {
+      return forIndoor ? deviceData.aqIndoorVOCValue : 0;
     }
 
     getDisplayUnits(deviceData: any): number {
