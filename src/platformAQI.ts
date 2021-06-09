@@ -37,6 +37,10 @@ export class DaikinOnePlusAQSensor {
     
     setInterval(async () => {
       this.deviceData = await this.daikinApi.getDeviceData(this.deviceId);
+      if(!this.deviceData){
+        this.platform.log.error('Unable to retrieve data.');
+        return;
+      }
 
       // push the new value to HomeKit
       this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, 

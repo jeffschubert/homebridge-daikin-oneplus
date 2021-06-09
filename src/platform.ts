@@ -75,6 +75,10 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   async discoverDevices() {
+    if(!this.config.name && !this.config.password) {
+      this.log.error('Credentials not set. Aborting discovery of devices.');
+      return;
+    }
 
     await this.daikinApi.Initialize();
     const devices = await this.daikinApi.getDeviceList();

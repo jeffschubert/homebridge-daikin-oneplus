@@ -36,6 +36,10 @@ export class DaikinOnePlusHumidity {
     
     setInterval(async () => {
       this.deviceData = await this.daikinApi.getDeviceData(this.deviceId);
+      if(!this.deviceData){
+        this.platform.log.error('Unable to retrieve data.');
+        return;
+      }
 
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
         this.handleHumidityGet(this.deviceData, forIndoor));

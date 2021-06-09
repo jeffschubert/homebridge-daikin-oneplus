@@ -21,6 +21,9 @@ export class DaikinApi{
         .then(()=>this.getLocation())
         .then(()=>this.getDevices())
         .then(()=>{
+          if(this._token === undefined || this._token === null){
+            this.platform.log.error('Unable to retrieve token.');
+          }
           this.platform.log.debug(this._locations);
           this.platform.log.debug(this._devices);
         });
@@ -37,9 +40,10 @@ export class DaikinApi{
           'Content-Type': 'application/json',
         },
       },
-      ).then((response)=>{
-        this.setToken(response);
-      });
+      )
+        .then((response)=>{
+          this.setToken(response);
+        });
     }
 
     async setToken(response: AxiosResponse<any>){
@@ -47,6 +51,10 @@ export class DaikinApi{
         this._token = response.data;
         this._tokenExpiration = new Date();
         this._tokenExpiration.setSeconds(this._tokenExpiration.getSeconds() + this._token.accessTokenExpiresIn);
+      } else{
+        this.platform.log.error(`Error retrieving token: Status ${response.status}`);
+        this.platform.log.error(response.data);
+        this.platform.log.error(response.headers);
       }
     }
 
@@ -80,6 +88,9 @@ export class DaikinApi{
       if(new Date() >= this._tokenExpiration){
         this.platform.log.info('Refreshing token.');
         this.refreshToken();
+      }
+      if(!this._token) {
+        this.platform.log.error(`No token for request: ${uri}`);
       }
       return axios.get(uri, {
         headers:{
