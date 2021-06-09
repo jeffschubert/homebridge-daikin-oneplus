@@ -25,24 +25,29 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     public readonly api: API,
   ) {
     let credSet = true;
-    if(!this.config.name) {
-      this.log.error('Daikin Username not set.');
+    if(!this.config.user) {
+      this.log.error('Daikin username not set.');
       credSet = false;
     }
     if(!this.config.password){
       this.log.error('Daikin password not set.');
       credSet = false;
     }
+
     if(!this.config.refreshInterval){
       this.config.refreshInterval = 10;
       this.log.warn('Refresh Interval not set. Using default of 10 seconds.');
     }
+    this.log.debug(`Using refresh interval of ${this.config.refreshInterval} seconds`);
+
     if(this.config.includeDeviceName === undefined) {
       this.config.includeDeviceName = false;
       this.log.warn('Include Device Name not set. Using default of false.');
     }
+    this.log.debug(`Using Include Device Name setting of ${this.config.includeDeviceName}`);
+    
+    this.log.debug(`Finished initializing platform: ${this.config.name}`);
 
-    this.log.debug('Finished initializing platform:', this.config.name);
     this.daikinApi = new DaikinApi(this.config.user!, this.config.password!, this);
     if(!credSet) {
       return;
@@ -85,21 +90,12 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     // loop over the discovered devices and register each one if it has not already been registered
     for (const device of devices) {
-      this.log.info(`Found device: ${device.id}::${device.name}`);
+      this.log.info(`Found device: ${device.name}`);
       const deviceData = await this.daikinApi.getDeviceData(device.id);
 
-      //Check if a thermostat accessory exists from before air quality and other accessories were also supported.
-      let uuid = this.api.hap.uuid.generate(`${device.id}`);
-      this.log.info('Checking for legacy thermostat... ', {uuid});
+      let uuid = this.api.hap.uuid.generate(`${device.id}_tstat`);
+      this.log.info('Checking for thermostat...');
       let existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-      if(existingAccessory){
-        this.log.info('Removing legacy thermostat from cache:', existingAccessory.displayName);
-        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-      }
-
-      uuid = this.api.hap.uuid.generate(`${device.id}_tstat`);
-      this.log.info('Checking for thermostat...', {uuid});
-      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       let dName = this.config.includeDeviceName ? `${device.name} Thermostat` : 'Thermostat';
       if (existingAccessory) {
         // the accessory already exists
@@ -117,7 +113,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       }
 
       uuid = this.api.hap.uuid.generate(`${device.id}_ohum`);
-      this.log.info('Checking for outdoor humidity sensor...', uuid);
+      this.log.info('Checking for outdoor humidity sensor...');
       existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       dName = this.config.includeDeviceName ? `${device.name} Outdoor Humidity` : 'Outdoor Humidity';
       if (existingAccessory) {
@@ -136,7 +132,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       }
 
       uuid = this.api.hap.uuid.generate(`${device.id}_ihum`);
-      this.log.info('Checking for indoor humidity sensor...', uuid);
+      this.log.info('Checking for indoor humidity sensor...');
       existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       dName = this.config.includeDeviceName ? `${device.name} Indoor Humidity` : 'Indoor Humidity';
       if (existingAccessory) {
@@ -155,7 +151,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       }
 
       uuid = this.api.hap.uuid.generate(`${device.id}_oaqi`);
-      this.log.info('Checking for outdoor Air Quality sensor...', uuid);
+      this.log.info('Checking for outdoor Air Quality sensor...');
       existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       dName = this.config.includeDeviceName ? `${device.name} Outdoor AQI` : 'Outdoor AQI';
       if(deviceData.aqOutdoorAvailable){
@@ -179,7 +175,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       }
 
       uuid = this.api.hap.uuid.generate(`${device.id}_iaqi`);
-      this.log.info('Checking for indoor Air Quality sensor...', uuid);
+      this.log.info('Checking for indoor Air Quality sensor...');
       existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       dName = this.config.includeDeviceName ? `${device.name} Indoor AQI` : 'Indoor AQI';
       if(deviceData.aqIndoorAvailable){

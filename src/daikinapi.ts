@@ -17,17 +17,33 @@ export class DaikinApi{
     }
 
     async Initialize(){
-      return this.getToken()
-        .then(()=>this.getLocation())
-        .then(()=>this.getDevices())
-        .then(()=>{
-          if(this._token === undefined || this._token === null){
-            this.platform.log.error('Unable to retrieve token.');
-          }
-          this.platform.log.debug(this._locations);
-          this.platform.log.debug(this._devices);
-        });
+      await this.getToken();
+      await this.getLocation();
+      await this.getDevices();
+      
+      if(this._token === undefined || this._token === null){
+        this.platform.log.error('Unable to retrieve token.');
+      }
+      this.platform.log.info(`Got locations: ${this._locations[0].name}`);
+      this.platform.log.info(`Got devices: ${this._devices[0].name}`);
+      await this.getData();
+    }
 
+    async getData(){
+      this.platform.log.debug(`********* Getting data: ${this._devices[0].name} *********`);
+      this._devices.forEach(async device => {
+        const data = await this.getDeviceData(device.id);
+        if(!data){
+          this.platform.log.error('Unable to retrieve data.');
+          return;
+        }
+        device.data = data;
+      });
+      this.platform.log.debug('Updated data values...');
+        
+      setTimeout(async ()=>{
+        await this.getData();
+      }, this.platform.config.refreshInterval*1000);
     }
 
     async getToken(){
@@ -119,69 +135,86 @@ export class DaikinApi{
       }
     }
     
-    getCurrentStatus(deviceData: any): number {
-      return deviceData.equipmentStatus;
+    getCurrentStatus(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.equipmentStatus;
     }
 
-    getCurrentTemp(deviceData: any): number {
-      return deviceData.tempIndoor;
+    getCurrentTemp(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.tempIndoor;
     }
 
-    getTargetState(deviceData: any): number {
-      return deviceData.mode;
+    getTargetState(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.mode;
     }
 
-    getTargetTemp(deviceData: any): number {
-      this.platform.log.debug('GET TargetTemp');
-      switch(deviceData.mode){
+    getTargetTemp(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      switch(device.data.mode){
         case 1: //heat
         case 4: //emrg heat
-          return deviceData.hspActive;
+          return device.data.hspActive;
         case 2: //cool
         case 3: //auto
         default:
-          return deviceData.cspActive;
+          return device.data.cspActive;
       }
     }
 
-    getCurrentHumidity(deviceData: any): number {
-      return deviceData.humIndoor;
+    getCurrentHumidity(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.humIndoor;
     }
 
-    getOutdoorHumidity(deviceData: any): number {
-      return deviceData.humOutdoor;
+    getOutdoorHumidity(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.humOutdoor;
     }
 
-    getTargetHumidity(deviceData: any): number {
-      return deviceData.humSP;
+    getTargetHumidity(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.humSP;
     }
 
-    getAirQualityLevel(deviceData: any, forIndoor:boolean): number {
-      return forIndoor ? deviceData.aqIndoorLevel : deviceData.aqOutdoorLevel;
+    getAirQualityLevel(deviceId: string, forIndoor:boolean): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return forIndoor ? device.data.aqIndoorLevel : device.data.aqOutdoorLevel;
     }
 
-    getOzone(deviceData: any, forIndoor:boolean): number {
-      return forIndoor ? 0 : deviceData.aqOutdoorOzone;
+    getOzone(deviceId: string, forIndoor:boolean): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return forIndoor ? 0 : device.data.aqOutdoorOzone;
     }
 
-    getAirQualityValue(deviceData: any, forIndoor:boolean): number {
-      return forIndoor ? deviceData.aqIndoorValue : deviceData.aqOutdoorValue;
+    getAirQualityValue(deviceId: string, forIndoor:boolean): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return forIndoor ? device.data.aqIndoorValue : device.data.aqOutdoorValue;
     }
 
-    getPM2_5Density(deviceData: any, forIndoor:boolean): number {
-      return forIndoor ? deviceData.aqIndoorParticlesValue : deviceData.aqOutdoorParticles;
+    getPM2_5Density(deviceId: string, forIndoor:boolean): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return forIndoor ? device.data.aqIndoorParticlesValue : device.data.aqOutdoorParticles;
     }
 
-    getVocDensity(deviceData: any, forIndoor:boolean): number {
-      return forIndoor ? deviceData.aqIndoorVOCValue : 0;
+    getVocDensity(deviceId: string, forIndoor:boolean): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return forIndoor ? device.data.aqIndoorVOCValue : 0;
     }
 
-    getDisplayUnits(deviceData: any): number {
-      return deviceData.units;
+    getDisplayUnits(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.units;
     }
 
-    async setTargetTemp(deviceId: string, deviceData: any, requestedTemp: number): Promise<boolean>{
-      this.platform.log.debug(`setTargetTemp-> device:${deviceId}; temp:${requestedTemp}`);
+    async setTargetTemp(deviceId: string, requestedTemp: number): Promise<boolean>{
+      const deviceData = await this.getDeviceData(deviceId);
+      if(!deviceData){
+        this.platform.log.info('Device data could not be retrieved. Unable to set target temp.');
+        return false;
+      }
+
       let requestedData = {};
       switch(deviceData.mode){
         case 1: //heat
@@ -217,7 +250,7 @@ export class DaikinApi{
       return true;
     }
 
-    async setTargetState(deviceId: string, deviceData: any, requestedState: number): Promise<boolean>{
+    async setTargetState(deviceId: string, requestedState: number): Promise<boolean>{
       this.platform.log.debug(`setTargetState-> device:${deviceId}; state:${requestedState}`);
       const requestedData = {mode: requestedState};
 

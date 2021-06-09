@@ -10,7 +10,6 @@ import { DaikinOnePlusPlatform } from './platform';
  */
 export class DaikinOnePlusHumidity {
   private service: Service;
-  private deviceData;
 
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
@@ -33,26 +32,25 @@ export class DaikinOnePlusHumidity {
 
     // set the service name, this is what is displayed as the default name on the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
-    
-    setInterval(async () => {
-      this.deviceData = await this.daikinApi.getDeviceData(this.deviceId);
-      if(!this.deviceData){
-        this.platform.log.error('Unable to retrieve data.');
-        return;
-      }
+    this.updateValues();
+  }
 
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
-        this.handleHumidityGet(this.deviceData, forIndoor));
+  updateValues() {
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
+      this.handleHumidityGet());
   
-      this.platform.log.debug('Updated values...');
-    }, this.platform.config.refreshInterval*1000);
+    this.platform.log.debug('Updated humidity characteristics...');
+        
+    setTimeout(()=>this.updateValues(), 1000);
   }
 
   /**
    * Handle requests to get the current value of the Humidity characteristic
    */
-  handleHumidityGet(deviceData, getIndoor: boolean): CharacteristicValue {
-    let currentHumidity = getIndoor ? this.daikinApi.getCurrentHumidity(deviceData) : this.daikinApi.getOutdoorHumidity(deviceData);
+  handleHumidityGet(): CharacteristicValue {
+    let currentHumidity = this.forIndoor 
+      ? this.daikinApi.getCurrentHumidity(this.deviceId) 
+      : this.daikinApi.getOutdoorHumidity(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if(currentHumidity < 0) {
       currentHumidity = 0;
