@@ -1,5 +1,4 @@
 {
-  "private": true,
   "displayName": "Daikin One+ Thermostat",
   "name": "homebridge-daikin-oneplus",
   "version": "1.0.0",
