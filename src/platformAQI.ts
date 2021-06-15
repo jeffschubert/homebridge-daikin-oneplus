@@ -52,7 +52,7 @@ export class DaikinOnePlusAQSensor {
     }
     this.platform.log.debug('Updated AQI characteristics...');
         
-    setTimeout(()=>this.updateValues(), 1000);
+    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**

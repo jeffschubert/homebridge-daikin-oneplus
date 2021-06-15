@@ -60,7 +60,7 @@ export class DaikinOnePlusThermostat {
 
     this.platform.log.debug('Updated thermostat characteristics...');
         
-    setTimeout(()=>this.updateValues(), 1000);
+    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**
