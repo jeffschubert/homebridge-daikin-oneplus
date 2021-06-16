@@ -63,23 +63,30 @@ export class DaikinApi{
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-      },
-      )
-        .then((response)=>{
-          this.setToken(response);
+      }).then((response)=>this.setToken(response))
+        .catch((error) => {
+          if (error.response) {
+            // When response status code is out of 2xx range 
+            this.platform.log.error('Error with token response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+            // When no response was received after request was made
+            this.platform.log.error('Error with token request:');
+            this.platform.log.error(error.request);
+          } else {
+            // Error
+            this.platform.log.error('General error getting token:');
+            this.platform.log.error(error.message);
+          }
         });
     }
 
     async setToken(response: AxiosResponse<any>){
-      if(response.status === 200){
-        this._token = response.data;
-        this._tokenExpiration = new Date();
-        this._tokenExpiration.setSeconds(this._tokenExpiration.getSeconds() + this._token.accessTokenExpiresIn);
-      } else{
-        this.platform.log.error(`Error retrieving token: Status ${response.status}`);
-        this.platform.log.error(response.data);
-        this.platform.log.error(response.headers);
-      }
+      this._token = response.data;
+      this._tokenExpiration = new Date();
+      this._tokenExpiration.setSeconds(this._tokenExpiration.getSeconds() + this._token.accessTokenExpiresIn);
     }
 
     getLocation(){
@@ -105,7 +112,25 @@ export class DaikinApi{
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-      }).then((response)=>this.setToken(response));
+      }).then((response)=>this.setToken(response))
+        .catch((error) => {
+          if (error.response) {
+          // When response status code is out of 2xx range 
+            this.platform.log.error('Error with token refresh response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+          // When no response was received after request was made
+            this.platform.log.error('Error with token refresh request:');
+            this.platform.log.error(error.request);
+          } else {
+          // Error
+            this.platform.log.error('General error refreshing token:');
+            this.platform.log.error(error.message);
+          }
+        });
+
     }
 
     getRequest(uri: string){
@@ -121,9 +146,26 @@ export class DaikinApi{
           'Accept': 'application/json',
           'Authorization': 'Bearer ' + this._token.accessToken,
         },
-      }).then((response)=>{
-        return response.data;
-      });
+      }).then((response)=>response.data) 
+        .catch((error) => {
+          this.platform.log.error(`Error with request: ${uri}`);
+          if (error.response) {
+          // When response status code is out of 2xx range 
+            this.platform.log.error('Error with response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+          // When no response was received after request was made
+            this.platform.log.error('Error with request:');
+            this.platform.log.error(error.request);
+          } else {
+          // Error
+            this.platform.log.error('General error:');
+            this.platform.log.error(error.message);
+          }
+        });
+
     }
 
     getDeviceList(){
@@ -260,8 +302,23 @@ export class DaikinApi{
         .then(res => {
           this.platform.log.debug('setTargetTemp-> response: ', res.data);
         })
-        .catch(error => {
+        .catch((error) => {
           this.platform.log.error(`Error updating target temp: ${error}`);
+          if (error.response) {
+            // When response status code is out of 2xx range 
+            this.platform.log.error('Error with response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+            // When no response was received after request was made
+            this.platform.log.error('Error with request:');
+            this.platform.log.error(error.request);
+          } else {
+            // Error
+            this.platform.log.error('General error:');
+            this.platform.log.error(error.message);
+          }
           return false;
         });
       return true;
@@ -282,10 +339,26 @@ export class DaikinApi{
         .then(res => {
           this.platform.log.debug('setTargetState-> response: ', res.data);
         })
-        .catch(error => {
+        .catch((error) => {
           this.platform.log.error(`Error updating target state: ${error}`);
+          if (error.response) {
+            // When response status code is out of 2xx range 
+            this.platform.log.error('Error with response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+            // When no response was received after request was made
+            this.platform.log.error('Error with request:');
+            this.platform.log.error(error.request);
+          } else {
+            // Error
+            this.platform.log.error('General error:');
+            this.platform.log.error(error.message);
+          }
           return false;
         });
+
       return true;
     }
 
@@ -304,10 +377,26 @@ export class DaikinApi{
         .then(res => {
           this.platform.log.debug('setDisplayUnits-> response: ', res.data);
         })
-        .catch(error => {
+        .catch((error) => {
           this.platform.log.error(`Error updating target state: ${error}`);
+          if (error.response) {
+            // When response status code is out of 2xx range 
+            this.platform.log.error('Error with response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+            // When no response was received after request was made
+            this.platform.log.error('Error with request:');
+            this.platform.log.error(error.request);
+          } else {
+            // Error
+            this.platform.log.error('General error:');
+            this.platform.log.error(error.message);
+          }
           return false;
         });
+
       return true;
     }
 
@@ -325,10 +414,26 @@ export class DaikinApi{
         .then(res => {
           this.platform.log.debug('setTargetState-> response: ', res.data);
         })
-        .catch(error => {
+        .catch((error) => {
           this.platform.log.error(`Error updating target humidity: ${error}`);
+          if (error.response) {
+            // When response status code is out of 2xx range 
+            this.platform.log.error('Error with response:');
+            this.platform.log.error(error.response.data);
+            this.platform.log.error(error.response.status);
+            this.platform.log.error(error.response.headers);
+          } else if (error.request) {
+            // When no response was received after request was made
+            this.platform.log.error('Error with request:');
+            this.platform.log.error(error.request);
+          } else {
+            // Error
+            this.platform.log.error('General error:');
+            this.platform.log.error(error.message);
+          }
           return false;
         });
+
       return true;
     }
 }
