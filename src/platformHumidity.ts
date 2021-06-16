@@ -36,11 +36,15 @@ export class DaikinOnePlusHumidity {
   }
 
   updateValues() {
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
-      this.handleHumidityGet());
+    if(this.daikinApi.deviceHasData(this.deviceId)){
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
+        this.handleHumidityGet());
   
-    this.platform.log.debug('Updated humidity characteristics...');
-        
+      this.platform.log.debug('Updated humidity characteristics...');
+    } else{
+      this.platform.log.info(`${this.accessory.displayName} waiting for data.`);
+    }
+
     setTimeout(()=>this.updateValues(), 2000);
   }
 

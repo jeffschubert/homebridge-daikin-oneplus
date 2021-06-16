@@ -49,17 +49,22 @@ export class DaikinOnePlusThermostat {
 
   updateValues() {
     // push the new value to HomeKit
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.handleCurrentHeatingCoolingStateGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.handleTargetHeatingCoolingStateGet());
+    if(this.daikinApi.deviceHasData(this.deviceId)){
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, 
+        this.handleCurrentHeatingCoolingStateGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, 
+        this.handleTargetHeatingCoolingStateGet());
 
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleCurrentTemperatureGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.handleTargetTemperatureGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleCurrentTemperatureGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.handleTargetTemperatureGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
 
-    this.platform.log.debug('Updated thermostat characteristics...');
-        
+      this.platform.log.debug('Updated thermostat characteristics...');
+    } else{
+      this.platform.log.info(`${this.accessory.displayName} waiting for data.`);
+    }
     setTimeout(()=>this.updateValues(), 2000);
   }
 

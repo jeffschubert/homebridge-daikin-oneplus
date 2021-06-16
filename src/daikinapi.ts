@@ -24,22 +24,30 @@ export class DaikinApi{
       if(this._token === undefined || this._token === null){
         this.platform.log.error('Unable to retrieve token.');
       }
-      this.platform.log.info(`Got locations: ${this._locations[0].name}`);
-      this.platform.log.info(`Got devices: ${this._devices[0].name}`);
+      this.platform.log.info(`Found ${this._locations.length} location(s): `);
+      this._locations.forEach(element => {
+        this.platform.log.info(`Location: ${element.name}`);
+      });
+      this.platform.log.info(`Found ${this._devices.length} device(s): `);
+      this._locations.forEach(element => {
+        this.platform.log.info(`Device: ${element.name}`);
+      });
+
       await this.getData();
+      this.platform.log.info('Loaded initial data.');
     }
 
     async getData(){
-      this.platform.log.debug(`********* Getting data: ${this._devices[0].name} *********`);
+      this.platform.log.debug('Getting data...');
       this._devices.forEach(async device => {
         const data = await this.getDeviceData(device.id);
         if(!data){
-          this.platform.log.error('Unable to retrieve data.');
+          this.platform.log.error(`Unable to retrieve data for ${device.name}.`);
           return;
         }
         device.data = data;
       });
-      this.platform.log.debug('Updated data values...');
+      this.platform.log.debug('Updated data.');
         
       setTimeout(async ()=>{
         await this.getData();
@@ -135,6 +143,15 @@ export class DaikinApi{
       }
     }
     
+    deviceHasData(deviceId: string): boolean {
+      const device = this._devices.find(e=>e.id === deviceId);
+      if(typeof device === 'undefined' ||
+      typeof device.data === 'undefined'){
+        return false;
+      }
+      return true;
+    }
+
     getCurrentStatus(deviceId: string): number {
       const device = this._devices.find(e=>e.id===deviceId);
       return device.data.equipmentStatus;
