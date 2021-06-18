@@ -1,5 +1,5 @@
 {
-  "displayName": "Daikin One+ Thermostat",
+  "displayName": "Homebridge Daikin One+",
   "name": "homebridge-daikin-oneplus",
   "version": "1.0.2",
   "description": "Control a Daikin One+ thermostat.",
