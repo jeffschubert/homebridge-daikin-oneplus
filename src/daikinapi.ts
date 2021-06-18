@@ -55,6 +55,7 @@ export class DaikinApi{
     }
 
     async getToken(){
+      this.platform.log.debug('Getting token...');
       return axios.post('https://api.daikinskyport.com/users/auth/login', {
         email: this.user,
         password: this.password,
@@ -86,7 +87,11 @@ export class DaikinApi{
     async setToken(response: AxiosResponse<any>){
       this._token = response.data;
       this._tokenExpiration = new Date();
-      this._tokenExpiration.setSeconds(this._tokenExpiration.getSeconds() + this._token.accessTokenExpiresIn);
+      //Set expiration a little early.
+      this._tokenExpiration.setSeconds(
+        this._tokenExpiration.getSeconds() 
+      + this._token.accessTokenExpiresIn 
+      - this.platform.config.refreshInterval);
     }
 
     getLocation(){
@@ -104,6 +109,12 @@ export class DaikinApi{
     }
 
     refreshToken(){
+      if(typeof this._token === 'undefined' ||
+      typeof this._token.refreshToken === 'undefined' ||
+      !this._token.refreshToken){
+        this.platform.log.debug('Cannot refresh token. Getting new token.');
+        return this.getToken();
+      }
       axios.post('https://api.daikinskyport.com/users/auth/token', {
         email: this.user,
         refreshToken: this._token.refreshToken,
@@ -113,24 +124,7 @@ export class DaikinApi{
           'Content-Type': 'application/json',
         },
       }).then((response)=>this.setToken(response))
-        .catch((error) => {
-          if (error.response) {
-          // When response status code is out of 2xx range 
-            this.platform.log.error('Error with token refresh response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-          // When no response was received after request was made
-            this.platform.log.error('Error with token refresh request:');
-            this.platform.log.error(error.request);
-          } else {
-          // Error
-            this.platform.log.error('General error refreshing token:');
-            this.platform.log.error(error.message);
-          }
-        });
-
+        .catch((error) => this.logError('Error retrieving token:', error));
     }
 
     getRequest(uri: string){
@@ -140,6 +134,7 @@ export class DaikinApi{
       }
       if(!this._token) {
         this.platform.log.error(`No token for request: ${uri}`);
+        return Promise.resolve();
       }
       return axios.get(uri, {
         headers:{
@@ -148,24 +143,9 @@ export class DaikinApi{
         },
       }).then((response)=>response.data) 
         .catch((error) => {
-          this.platform.log.error(`Error with request: ${uri}`);
-          if (error.response) {
-          // When response status code is out of 2xx range 
-            this.platform.log.error('Error with response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-          // When no response was received after request was made
-            this.platform.log.error('Error with request:');
-            this.platform.log.error(error.request);
-          } else {
-          // Error
-            this.platform.log.error('General error:');
-            this.platform.log.error(error.message);
-          }
+          this.logError(`Error with getRequest: ${uri}`, error);
+          return Promise.resolve();
         });
-
     }
 
     getDeviceList(){
@@ -291,7 +271,7 @@ export class DaikinApi{
           return false;
       }
       this.platform.log.debug('setTargetTemp-> requestedData: ', requestedData);
-      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
         requestedData, {
           headers: {
             'Accept': 'application/json',
@@ -301,34 +281,16 @@ export class DaikinApi{
         })
         .then(res => {
           this.platform.log.debug('setTargetTemp-> response: ', res.data);
+          return true;
         })
-        .catch((error) => {
-          this.platform.log.error(`Error updating target temp: ${error}`);
-          if (error.response) {
-            // When response status code is out of 2xx range 
-            this.platform.log.error('Error with response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-            // When no response was received after request was made
-            this.platform.log.error('Error with request:');
-            this.platform.log.error(error.request);
-          } else {
-            // Error
-            this.platform.log.error('General error:');
-            this.platform.log.error(error.message);
-          }
-          return false;
-        });
-      return true;
+        .catch((error) => this.logError('Error updating target temp: ', error));
     }
 
     async setTargetState(deviceId: string, requestedState: number): Promise<boolean>{
       this.platform.log.debug(`setTargetState-> device:${deviceId}; state:${requestedState}`);
       const requestedData = {mode: requestedState};
 
-      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
         requestedData, {
           headers: {
             'Accept': 'application/json',
@@ -338,35 +300,16 @@ export class DaikinApi{
         })
         .then(res => {
           this.platform.log.debug('setTargetState-> response: ', res.data);
+          return true; 
         })
-        .catch((error) => {
-          this.platform.log.error(`Error updating target state: ${error}`);
-          if (error.response) {
-            // When response status code is out of 2xx range 
-            this.platform.log.error('Error with response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-            // When no response was received after request was made
-            this.platform.log.error('Error with request:');
-            this.platform.log.error(error.request);
-          } else {
-            // Error
-            this.platform.log.error('General error:');
-            this.platform.log.error(error.message);
-          }
-          return false;
-        });
-
-      return true;
+        .catch((error) => this.logError('Error updating target state:', error));
     }
 
     async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{
       this.platform.log.debug(`setDisplayUnits-> device:${deviceId}; units:${requestedUnits}`);
       const requestedData = {units: requestedUnits};
 
-      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
         requestedData, {
           headers: {
             'Accept': 'application/json',
@@ -376,34 +319,15 @@ export class DaikinApi{
         })
         .then(res => {
           this.platform.log.debug('setDisplayUnits-> response: ', res.data);
+          return true;
         })
-        .catch((error) => {
-          this.platform.log.error(`Error updating target state: ${error}`);
-          if (error.response) {
-            // When response status code is out of 2xx range 
-            this.platform.log.error('Error with response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-            // When no response was received after request was made
-            this.platform.log.error('Error with request:');
-            this.platform.log.error(error.request);
-          } else {
-            // Error
-            this.platform.log.error('General error:');
-            this.platform.log.error(error.message);
-          }
-          return false;
-        });
-
-      return true;
+        .catch((error) => this.logError('Error updating target state:', error));
     }
 
     async setTargetHumidity(deviceId: string, requestedHumidity: number) : Promise<boolean>{
       this.platform.log.debug(`setTargetHumidity-> device:${deviceId}; humidity:${requestedHumidity}`);
       const requestedData = {humSP: requestedHumidity};
-      await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
         requestedData, {
           headers: {
             'Accept': 'application/json',
@@ -413,27 +337,28 @@ export class DaikinApi{
         })
         .then(res => {
           this.platform.log.debug('setTargetState-> response: ', res.data);
+          return true;
         })
-        .catch((error) => {
-          this.platform.log.error(`Error updating target humidity: ${error}`);
-          if (error.response) {
-            // When response status code is out of 2xx range 
-            this.platform.log.error('Error with response:');
-            this.platform.log.error(error.response.data);
-            this.platform.log.error(error.response.status);
-            this.platform.log.error(error.response.headers);
-          } else if (error.request) {
-            // When no response was received after request was made
-            this.platform.log.error('Error with request:');
-            this.platform.log.error(error.request);
-          } else {
-            // Error
-            this.platform.log.error('General error:');
-            this.platform.log.error(error.message);
-          }
-          return false;
-        });
+        .catch((error) => this.logError('Error updating target humidity:', error));
+    }
 
-      return true;
+    logError(message: string, error): boolean{
+      this.platform.log.error(message);
+      if (error.response) {
+        // When response status code is out of 2xx range 
+        this.platform.log.error('Error with response:');
+        this.platform.log.error(error.response.data);
+        this.platform.log.error(error.response.status);
+        this.platform.log.error(error.response.headers);
+      } else if (error.request) {
+        // When no response was received after request was made
+        this.platform.log.error('Error with request:');
+        this.platform.log.error(error.request);
+      } else {
+        // Error
+        this.platform.log.error('General error:');
+        this.platform.log.error(error.message);
+      }
+      return false;
     }
 }
