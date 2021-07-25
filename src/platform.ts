@@ -1,10 +1,10 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
+import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic, LogLevel } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DaikinOnePlusThermostat } from './platformThermostat';
 import { DaikinOnePlusAQSensor } from './platformAQI';
 import { DaikinOnePlusHumidity } from './platformHumidity';
-import { DaikinApi } from './daikinapi';
+import { DaikinApi, LoggerLevel, LogMessage } from './daikinapi';
 
 /**
  * HomebridgePlatform
@@ -48,7 +48,19 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     
     this.log.debug(`Finished initializing platform: ${this.config.name}`);
 
-    this.daikinApi = new DaikinApi(this.config.user!, this.config.password!, this);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const logMessage: LogMessage = (level: LoggerLevel, message: string, ...parameters: any[]): void => {
+      let logLevel: LogLevel = LogLevel.INFO;
+      switch(level){
+        case LoggerLevel.INFO: logLevel = LogLevel.INFO; break;
+        case LoggerLevel.WARN: logLevel = LogLevel.WARN; break;
+        case LoggerLevel.ERROR: logLevel = LogLevel.ERROR; break;
+        case LoggerLevel.DEBUG: logLevel = LogLevel.DEBUG; break;
+      }
+      this.log.log(logLevel, message, parameters);
+    };
+    
+    this.daikinApi = new DaikinApi(this.config.user!, this.config.password!, this.config.refreshInterval, logMessage);
     if(!credSet) {
       return;
     }
