@@ -40,9 +40,9 @@ export class DaikinOnePlusHumidity {
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
         this.handleHumidityGet());
   
-      this.platform.log.debug('Updated humidity characteristics...');
+      this.platform.log.debug('Humidity', this.accessory.displayName, '- Updated humidity characteristics...');
     } else{
-      this.platform.log.info(`${this.accessory.displayName} waiting for data.`);
+      this.platform.log.info('Humidity', this.accessory.displayName, '- Waiting for data...');
     }
 
     setTimeout(()=>this.updateValues(), 2000);
@@ -61,7 +61,7 @@ export class DaikinOnePlusHumidity {
     } else if (currentHumidity > 100) {
       currentHumidity = 100;
     }
-    this.platform.log.debug(`GET Humidity ${currentHumidity}`);
+    this.platform.log.debug('Humidity', this.accessory.displayName, '- Get Humidity:', currentHumidity);
     return currentHumidity;
   }
 }

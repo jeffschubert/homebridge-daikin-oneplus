@@ -51,9 +51,9 @@ export class DaikinOnePlusAQSensor {
       if(this.forIndoor){
         this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
       }
-      this.platform.log.debug('Updated AQI characteristics...');
+      this.platform.log.debug('AQI', this.accessory.displayName, '- Updated AQI characteristics...');
     } else{
-      this.platform.log.info(`${this.accessory.displayName} waiting for data.`);
+      this.platform.log.info('AQI', this.accessory.displayName, '- Waiting for data...');
     }
       
     setTimeout(()=>this.updateValues(), 2000);
@@ -80,7 +80,7 @@ export class DaikinOnePlusAQSensor {
         currentValue = this.platform.Characteristic.AirQuality.POOR;
         break;
     }
-    this.platform.log.debug(`GET AirQuality ${currentValue}`);
+    this.platform.log.debug('AQI', this.accessory.displayName, '- Get AirQuality:', currentValue);
     return currentValue;
   }
   
@@ -94,7 +94,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(`GET Ozone ${currentValue}`);
+    this.platform.log.debug('AQI', this.accessory.displayName, '- Get Ozone:', currentValue);
     return currentValue;
   }
   
@@ -109,7 +109,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 500) {
       currentValue = 500;
     }
-    this.platform.log.debug(`GET AirQualityValue ${currentValue}`);
+    this.platform.log.debug('AQI', this.accessory.displayName, '- Get AirQualityValue:', currentValue);
     return currentValue;
   }
   
@@ -124,7 +124,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(`GET PM2_5Density ${currentValue}`);
+    this.platform.log.debug('AQI', this.accessory.displayName, '- Get PM2_5Density:', currentValue);
     return currentValue;
   }
   
@@ -139,7 +139,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(`GET Voc Density ${currentValue}`);
+    this.platform.log.debug('AQI', this.accessory.displayName, '- Get Voc Density:', currentValue);
     return currentValue;
   }
 }
