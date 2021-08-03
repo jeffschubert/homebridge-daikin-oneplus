@@ -9,6 +9,17 @@ and allow you to set the desired humidity level.
 
 If your Daikin system reports such values, the plugin will also create separate Air Quality and Indoor/Outdoor Humidity sensors.
 
+## Installation
+If you are new to Homebridge, please first read the [Homebridge](https://homebridge.io) [documentation](https://github.com/homebridge/homebridge/wiki) and installation instructions before proceeding.
+
+If you have installed the [Homebridge Config UI](https://github.com/oznu/homebridge-config-ui-x), you can intall this plugin by going to the `Plugins` tab and searching for `homebridge-daikin-oneplus` and installing it.
+
+If you prefer to install `homebridge-daikin-oneplus` from the command line, you can do so by executing:
+
+```sh
+sudo npm install -g homebridge-daikin-oneplus
+```
+
 ## Homebridge Config
 
 The easiest way to configure this plugin is via [Homebridge Config UI X](https://github.com/oznu/homebridge-config-ui-x).
