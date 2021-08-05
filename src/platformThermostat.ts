@@ -15,6 +15,7 @@ export class DaikinOnePlusThermostat {
   CurrentTemperature!: CharacteristicValue;
   TargetTemperature!: CharacteristicValue;
   CurrentHeatingCoolingState!: CharacteristicValue;
+  CurrentRelativeHumidity!: CharacteristicValue;
   TargetHeatingCoolingState!: CharacteristicValue;
   TargetRelativeHumidity!: CharacteristicValue;
   TemperatureDisplayUnits!: CharacteristicValue;
@@ -74,6 +75,8 @@ export class DaikinOnePlusThermostat {
       this.TargetHeatingCoolingState = this.handleTargetHeatingCoolingStateGet();
       this.TemperatureDisplayUnits = this.handleTemperatureDisplayUnitsGet();
       this.TargetRelativeHumidity = this.handleTargetHumidityGet();
+      this.CurrentHeatingCoolingState = this.handleCurrentHeatingCoolingStateGet();
+      this.CurrentRelativeHumidity = this.handleCurrentHumidityGet();
 
       if (this.TargetTemperature !== undefined) {
         this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.TargetTemperature);
@@ -90,11 +93,12 @@ export class DaikinOnePlusThermostat {
       if(this.TargetRelativeHumidity !== undefined){
         this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.TargetRelativeHumidity);
       }
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, 
-        this.handleCurrentHeatingCoolingStateGet());
-
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
-
+      if(this.CurrentHeatingCoolingState !== undefined){
+        this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.CurrentHeatingCoolingState);
+      }
+      if(this.CurrentRelativeHumidity !== undefined){
+        this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.CurrentRelativeHumidity);
+      }
       this.platform.log.debug('Thermostat', this.accessory.displayName, '- Updated thermostat characteristics...');
     } else{
       this.platform.log.info('Thermostat', this.accessory.displayName, '- Waiting for data...');
