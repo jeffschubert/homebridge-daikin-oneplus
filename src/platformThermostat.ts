@@ -41,12 +41,22 @@ export class DaikinOnePlusThermostat {
     // set the service name, this is what is displayed as the default name on the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
     
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState)
+      .onGet(()=>{
+        return this.CurrentHeatingCoolingState!;
+      });
+      
     this.service.getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
       .onGet(()=>{
         return this.TargetHeatingCoolingState!;
       })
       .onSet(this.handleTargetHeatingCoolingStateSet.bind(this));
 
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
+      .onGet(()=>{
+        return this.CurrentTemperature!;
+      });
+      
     this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
       .onGet(()=>{
         return this.TargetTemperature!;
@@ -59,6 +69,11 @@ export class DaikinOnePlusThermostat {
       })
       .onSet(this.handleTemperatureDisplayUnitsSet.bind(this));
 
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(()=>{
+        return this.CurrentRelativeHumidity!;
+      });
+      
     this.service.getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)
       .onGet(()=>{
         return this.TargetRelativeHumidity!;
