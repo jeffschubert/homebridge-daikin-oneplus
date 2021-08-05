@@ -168,7 +168,6 @@ export class DaikinApi{
 
     getRequest(uri: string){
       if(new Date() >= this._tokenExpiration){
-        this.log(LoggerLevel.INFO, 'Refreshing token.');
         this.refreshToken();
       }
       if(!this._token) {

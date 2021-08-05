@@ -1,4 +1,14 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic, LogLevel } from 'homebridge';
+import { 
+  API, 
+  DynamicPlatformPlugin, 
+  Logger, 
+  PlatformAccessory, 
+  PlatformConfig, 
+  Service, 
+  Characteristic, 
+  LogLevel, 
+  APIEvent, 
+} from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DaikinOnePlusThermostat } from './platformThermostat';
@@ -18,7 +28,8 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
   private readonly daikinApi: DaikinApi;
-  
+  private discoverTimer!: NodeJS.Timeout;
+
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
@@ -68,11 +79,27 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
-    this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      // run the method to discover / register your devices as accessories
-      this.discoverDevices();
-    });
+    this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discover.bind(this)); 
+  }
+
+  private discover(): void {
+    this.log.debug('Executed didFinishLaunching callback');
+
+    clearTimeout(this.discoverTimer);
+
+    //If initialized, no need to try and discover devices again.
+    if(this.daikinApi.isInitialized()){
+      return;
+    }
+    this.discoverTimer = setTimeout(()=>{
+      void (async():Promise<void>=>{
+        // run the method to discover / register your devices as accessories
+        await this.discoverDevices();
+
+        //Call discover again in case we failed to initialize the api and discover devices.
+        this.discover();
+      })();
+    }, this.config.refreshInterval * 1000);
   }
 
   /**
