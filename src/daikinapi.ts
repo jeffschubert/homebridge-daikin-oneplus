@@ -26,6 +26,7 @@ export class DaikinApi{
     private _locations;
     private _tokenExpiration;
     private _devices;
+    private _isInitialized = false;
 
     constructor(
         private readonly user : string,
@@ -38,23 +39,41 @@ export class DaikinApi{
 
     async Initialize(){
       await this.getToken();
-      await this.getLocation();
-      await this.getDevices();
       
       if(this._token === undefined || this._token === null){
         this.log(LoggerLevel.ERROR, 'Unable to retrieve token.');
+        return;
       }
-      this.log(LoggerLevel.INFO, `Found ${this._locations.length} location(s): `);
-      this._locations.forEach(element => {
-        this.log(LoggerLevel.INFO, `Location: ${element.name}`);
-      });
-      this.log(LoggerLevel.INFO, `Found ${this._devices.length} device(s): `);
-      this._locations.forEach(element => {
-        this.log(LoggerLevel.INFO, `Device: ${element.name}`);
-      });
+
+      await this.getLocations();
+      await this.getDevices();
+      
+      if(this._locations !== undefined){
+        this.log(LoggerLevel.INFO, `Found ${this._locations.length} location(s): `);
+        this._locations.forEach(element => {
+          this.log(LoggerLevel.INFO, `Location: ${element.name}`);
+        });
+      } else{
+        this.log(LoggerLevel.INFO, 'No locations found.');
+        return;
+      }
+      if(this._devices !== undefined){
+        this.log(LoggerLevel.INFO, `Found ${this._devices.length} device(s): `);
+        this._locations.forEach(element => {
+          this.log(LoggerLevel.INFO, `Device: ${element.name}`);
+        });
+      }else {
+        this.log(LoggerLevel.INFO, 'No devices found.');
+        return;
+      }
 
       await this.getData();
       this.log(LoggerLevel.INFO, 'Loaded initial data.');
+      this._isInitialized = true;
+    }
+
+    isInitialized(): boolean {
+      return this._isInitialized;
     }
 
     async getData(){
@@ -114,7 +133,7 @@ export class DaikinApi{
       - this.refreshInterval);
     }
 
-    getLocation(){
+    getLocations(){
       return this.getRequest('https://api.daikinskyport.com/locations')
         .then((response)=>this._locations = response);
     }

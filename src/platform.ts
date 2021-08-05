@@ -96,8 +96,13 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.log.error('Credentials not set. Aborting discovery of devices.');
       return;
     }
-
+    
     await this.daikinApi.Initialize();
+
+    if(!this.daikinApi.isInitialized()){
+      this.log.error('Unable to retrieve devices. Aborting discovery of devices.');
+      return;
+    }
     const devices = await this.daikinApi.getDeviceList();
 
     // loop over the discovered devices and register each one if it has not already been registered
