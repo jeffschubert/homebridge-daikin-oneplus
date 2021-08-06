@@ -27,7 +27,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
-  private readonly daikinApi: DaikinApi;
+  private readonly daikinApi!: DaikinApi;
   private discoverTimer!: NodeJS.Timeout;
 
   constructor(
@@ -35,14 +35,13 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
-    let credSet = true;
-    if(!this.config.user) {
-      this.log.error('Daikin username not set.');
-      credSet = false;
+    //Don't start if not configured
+    if(!this.config){
+      this.log.error('Not configured.');
+      return;
     }
-    if(!this.config.password){
-      this.log.error('Daikin password not set.');
-      credSet = false;
+    if(!this.config.user || !this.config.password) {
+      this.log.error('No Daikin login credentials configured.');
     }
 
     if(!this.config.refreshInterval){
@@ -72,9 +71,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     };
     
     this.daikinApi = new DaikinApi(this.config.user!, this.config.password!, this.config.refreshInterval, logMessage);
-    if(!credSet) {
-      return;
-    }
+
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
