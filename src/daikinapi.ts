@@ -293,13 +293,48 @@ export class DaikinApi{
       }
 
       let requestedData = {};
+      let autoHsp = deviceData.hspHome;
       switch(deviceData.mode){
         case 1: //heat
-          requestedData = {hspHome: requestedTemp};
+          if(deviceData.schedEnabled){
+            requestedData = {
+              schedOverride: 1, 
+              hspHome: requestedTemp,
+            };
+          } else{
+            requestedData = {hspHome: requestedTemp};
+          }
           break;
         case 2: //cool
+          if(deviceData.schedEnabled){
+            requestedData = {
+              schedOverride: 1, 
+              cspHome: requestedTemp,
+            };
+          } else{
+            requestedData = {cspHome: requestedTemp};
+          }
+          break;
         case 3: //auto
-          requestedData = {cspHome: requestedTemp};
+          //In auto mode, also set heating set point if it would be too close to the requested temp
+          autoHsp = deviceData.hspHome + deviceData.tempDeltaMin >= requestedTemp 
+            ? requestedTemp - deviceData.tempDeltaMin 
+            : deviceData.hspHome;
+          //TODO: Come up with a way to detect when the requestedTemp is intended by the user to be the heating set point instead.
+          // i.e. it is winter and they're wanting to make it warmer instead of cooler. Daikin app allows setting both in auto mode
+          //   but HomeKit only allows setting a single temp
+          if(deviceData.schedEnabled){
+            requestedData = {
+              schedOverride: 1, 
+              cspHome: requestedTemp,
+              hspHome: autoHsp,
+            };
+          } else{
+            requestedData = {
+              cspHome: requestedTemp,
+              hspHome: autoHsp,
+            };
+          }
           break;
         case 4: //emrg heat
           this.log(LoggerLevel.INFO, 'Device is in Emergency Heat. Unable to set target temp.');
