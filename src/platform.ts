@@ -76,10 +76,11 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
-    this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discover.bind(this)); 
+    //Set first delay to -refreshInterval to immediately refresh
+    this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discover.bind(this, this.config.refreshInterval * -1)); 
   }
 
-  private discover(): void {
+  private discover(delay = 0): void {
     this.log.debug('Executed didFinishLaunching callback');
 
     clearTimeout(this.discoverTimer);
@@ -88,6 +89,8 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     if(this.daikinApi.isInitialized()){
       return;
     }
+
+    const refresh = this.config.refreshInterval + delay;
     this.discoverTimer = setTimeout(()=>{
       void (async():Promise<void>=>{
         // run the method to discover / register your devices as accessories
@@ -96,7 +99,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         //Call discover again in case we failed to initialize the api and discover devices.
         this.discover();
       })();
-    }, this.config.refreshInterval * 1000);
+    }, refresh * 1000);
   }
 
   /**
