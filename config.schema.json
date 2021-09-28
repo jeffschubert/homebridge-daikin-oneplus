@@ -37,6 +37,13 @@
         "type": "boolean",
         "default": false,
         "required": true
+      },
+      "enableAwaySwitch": {
+        "title": "Enable Away Switch",
+        "description": "Enable switch to get/set the Away state of the thermostat.",
+        "type": "boolean",
+        "default": false,
+        "required": true
       }
     }
   }

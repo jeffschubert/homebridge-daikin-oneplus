@@ -285,6 +285,11 @@ export class DaikinApi{
       return device.data.units;
     }
 
+    getAwayState(deviceId: string): boolean {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.geofencingAway && device.data.geofencingEnabled;
+    }
+
     async setTargetTemp(deviceId: string, requestedTemp: number): Promise<boolean>{
       const deviceData = await this.getDeviceData(deviceId);
       if(!deviceData){
@@ -413,6 +418,47 @@ export class DaikinApi{
           return true;
         })
         .catch((error) => this.logError('Error updating target humidity:', error));
+    }
+
+    async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
+      const deviceData = await this.getDeviceData(deviceId);
+      if(!deviceData){
+        this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set away state.');
+        return false;
+      }
+
+      let requestedData = {};
+      switch(deviceData.geofencingEnabled){
+        case true: //thermostat has geofencing enabled, thus we can just toggle away state
+          requestedData = {geofencingAway: requestedState};
+          break;
+        case false: //thermostat has geofencing disabled, thus we need to set it and also toggle away state
+          if(requestedState){
+            requestedData = {
+              geofencingEnabled: true, 
+              geofencingAway: true,
+            };
+          } else{
+            // nothing to do. geofencing is disabled so away state can't be set.
+            this.log(LoggerLevel.INFO, 'Device has geofencing disabled. Unable to set away state to off.');
+            return true;
+          }
+          break;
+      }
+      this.log(LoggerLevel.DEBUG, 'setAwayState-> requestedData: ', requestedData);
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
+        .then(res => {
+          this.log(LoggerLevel.DEBUG, 'setAwayState-> response: ', res.data);
+          return true;
+        })
+        .catch((error) => this.logError('Error updating away state: ', error));
     }
 
     logError(message: string, error): boolean{

@@ -14,6 +14,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DaikinOnePlusThermostat } from './platformThermostat';
 import { DaikinOnePlusAQSensor } from './platformAQI';
 import { DaikinOnePlusHumidity } from './platformHumidity';
+import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch';
 import { DaikinApi, LoggerLevel, LogMessage } from './daikinapi';
 
 /**
@@ -239,6 +240,31 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         }
       } else if(existingAccessory){
         this.log.info('Removing legacy indoor Air Quality Sensor from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+      }
+
+      uuid = this.api.hap.uuid.generate(`${device.id}_away`);
+      this.log.info('Checking for Away Switch...');
+      existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      if(this.config.enableAwaySwitch){
+        dName = this.config.includeDeviceName ? `${device.name} Away State` : 'Away State';
+        if (existingAccessory) {
+        // the accessory already exists
+          existingAccessory.displayName = dName;
+          this.log.info('Restoring existing away switch from cache:', existingAccessory.displayName);
+          new DaikinOnePlusAwaySwitch(this, existingAccessory, device.id, this.daikinApi, dName);
+        } else {
+        // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new away switch:', dName);
+
+          const accessory = new this.api.platformAccessory(dName, uuid);
+          accessory.context.device = device;
+          new DaikinOnePlusAwaySwitch(this, accessory, device.id, this.daikinApi, dName);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      } else if (existingAccessory){
+        //Delete any existing Away switch
+        this.log.info('Removing Away switch from cache:', existingAccessory.displayName);
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
     }
