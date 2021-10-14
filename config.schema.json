@@ -2,8 +2,8 @@
   "pluginAlias": "DaikinOnePlus",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "All devices associated with the configured Daikin account will be loaded as accessories.",
-  "footerDisplay": "You must have a Daikin One+ Smart Thermostat and cloud account for this to work.",
+  "headerDisplay": "All devices associated with the configured Daikin account will be loaded as accessories.\nYou must have a Daikin One+ Smart Thermostat and Daikin cloud account for this plugin to work.",
+  "footerDisplay": "",
   "schema": {
     "type": "object",
     "properties": {
@@ -38,13 +38,87 @@
         "default": false,
         "required": true
       },
+      "ignoreThermostat": {
+        "title": "Ignore Thermostat(s)",
+        "description": "Do not load thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false,
+        "required": true
+      },
+      "ignoreIndoorAqi": {
+        "title": "Ignore Indoor Air Quality Sensor(s)",
+        "description": "Do not load indoor air quality sensors of thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false,
+        "required": true
+      },
+      "ignoreOutdoorAqi": {
+        "title": "Ignore Outdoor Air Quality Sensor(s)",
+        "description": "Do not load outdoor air quality sensors of thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false,
+        "required": true
+      },
+      "ignoreIndoorHumSensor": {
+        "title": "Ignore Indoor Humidity Sensor(s)",
+        "description": "Do not load indoor humidity sensors of thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false,
+        "required": true
+      },
+      "ignoreOutdoorHumSensor": {
+        "title": "Ignore Indoor Humidity Sensor(s)",
+        "description": "Do not load indoor humidity sensors of thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false,
+        "required": true
+      },
       "enableAwaySwitch": {
         "title": "Enable Away Switch",
-        "description": "Enable switch to get/set the Away state of the thermostat.",
+        "description": "Enable switch to get/set the Away state of thermostats found in Daikin account.",
         "type": "boolean",
         "default": false,
         "required": true
       }
     }
-  }
+  },
+  "layout": [
+    {
+      "type": "flex",
+      "flex-flow": "row wrap",
+      "items": [
+        {
+          "type": "flex",
+          "flex-flow": "column",
+          "items": [
+            "name",
+            "refreshInterval",
+            "includeDeviceName"
+          ]
+        },
+        {
+          "type": "flex",
+          "flex-flow": "column",
+          "items": [
+            "user",
+            "password"
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "ignore",
+      "type": "fieldset",
+      "expandable": true,
+      "title": "Accessory Setup",
+      "description": "Prevent specific accessories from being loaded on start up.",
+      "items": [
+        "ignoreThermostat",
+        "ignoreIndoorAqi",
+        "ignoreOutdoorAqi",
+        "ignoreIndoorHumSensor",
+        "ignoreOutdoorHumSensor",
+        "enableAwaySwitch"
+      ]
+    }]
 }
