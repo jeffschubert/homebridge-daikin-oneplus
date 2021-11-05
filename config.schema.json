@@ -35,50 +35,43 @@
         "title": "Include Device Name",
         "description": "Include device name as part of the default sensor name.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "ignoreThermostat": {
         "title": "Ignore Thermostat(s)",
         "description": "Do not load thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "ignoreIndoorAqi": {
         "title": "Ignore Indoor Air Quality Sensor(s)",
         "description": "Do not load indoor air quality sensors of thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "ignoreOutdoorAqi": {
         "title": "Ignore Outdoor Air Quality Sensor(s)",
         "description": "Do not load outdoor air quality sensors of thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "ignoreIndoorHumSensor": {
         "title": "Ignore Indoor Humidity Sensor(s)",
         "description": "Do not load indoor humidity sensors of thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "ignoreOutdoorHumSensor": {
         "title": "Ignore Indoor Humidity Sensor(s)",
         "description": "Do not load indoor humidity sensors of thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       },
       "enableAwaySwitch": {
         "title": "Enable Away Switch",
         "description": "Enable switch to get/set the Away state of thermostats found in Daikin account.",
         "type": "boolean",
-        "default": false,
-        "required": true
+        "default": false
       }
     }
   },
@@ -91,8 +84,8 @@
           "type": "flex",
           "flex-flow": "column",
           "items": [
-            "name",
-            "refreshInterval",
+            "user",
+            "password",
             "includeDeviceName"
           ]
         },
@@ -100,8 +93,8 @@
           "type": "flex",
           "flex-flow": "column",
           "items": [
-            "user",
-            "password"
+            "name",
+            "refreshInterval"
           ]
         }
       ]
