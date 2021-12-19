@@ -62,8 +62,8 @@
         "default": false
       },
       "ignoreOutdoorHumSensor": {
-        "title": "Ignore Indoor Humidity Sensor(s)",
-        "description": "Do not load indoor humidity sensors of thermostats found in Daikin account.",
+        "title": "Ignore Outdoor Humidity Sensor(s)",
+        "description": "Do not load outdoor humidity sensors of thermostats found in Daikin account.",
         "type": "boolean",
         "default": false
       },
