@@ -63,19 +63,32 @@ export class DaikinOnePlusThermostat {
       .onGet(()=>{
         return this.TargetTemperature!;
       })
-      .onSet(this.handleTargetTemperatureSet.bind(this));
+      .onSet(this.handleTargetTemperatureSet.bind(this))
+      .setProps({
+        minStep: 0.5,
+      });
 
     this.service.getCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature)
       .onGet(()=>{
         return this.CoolingThresholdTemperature!;
       })
-      .onSet(this.handleCoolingThresholdTemperatureSet.bind(this));
+      .onSet(this.handleCoolingThresholdTemperatureSet.bind(this))
+      .setProps({
+        minValue: 12,
+        maxValue: 32,
+        minStep: 0.5,
+      });
 
     this.service.getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
       .onGet(()=>{
         return this.HeatingThresholdTemperature!;
       })
-      .onSet(this.handleHeatingThresholdTemperatureSet.bind(this));
+      .onSet(this.handleHeatingThresholdTemperatureSet.bind(this))
+      .setProps({
+        minValue: 10,
+        maxValue: 30,
+        minStep: 0.5,
+      });
 
     this.service.getCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits)
       .onGet(()=>{
@@ -114,6 +127,20 @@ export class DaikinOnePlusThermostat {
       }
       if(this.TargetHeatingCoolingState !== undefined){
         this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.TargetHeatingCoolingState);
+      }
+      if (this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
+        this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
+          .setProps({
+            minValue: 10,
+            maxValue: 30,
+          });
+      }
+      if (this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
+        this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
+          .setProps({
+            minValue: 12,
+            maxValue: 32,
+          });
       }
       if (this.CurrentTemperature !== undefined) {
         this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.CurrentTemperature);
