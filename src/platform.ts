@@ -16,6 +16,7 @@ import { DaikinOnePlusAQSensor } from './platformAQI';
 import { DaikinOnePlusHumidity } from './platformHumidity';
 import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch';
 import { DaikinApi, LoggerLevel, LogMessage } from './daikinapi';
+import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan';
 
 /**
  * HomebridgePlatform
@@ -143,7 +144,36 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.discoverIndoorHumSensor(device);
       this.discoverOutdoorAqi(device, deviceData);
       this.discoverIndoorAqi(device, deviceData);
-      this.discoverAwaySwitch(device);
+      this.discoverOneCleanFan(device);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private discoverOneCleanFan(device: any) {
+    const uuid = this.api.hap.uuid.generate(`${device.id}_one_clean_fan`);
+    this.log.info('Checking for One Clean Fan...');
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config.enableOneCleanFan) {
+      const dName = this.config.includeDeviceName ? `${device.name} One Clean` : 'One Clean';
+      if (existingAccessory) {
+        // the accessory already exists
+        existingAccessory.displayName = dName;
+        this.log.info('Restoring existing one clean fan from cache:', existingAccessory.displayName);
+        new DaikinOnePlusOneCleanFan(this, existingAccessory, device.id, this.daikinApi);
+      } else {
+        // the accessory does not yet exist, so we need to create it
+        this.log.info('Adding new one clean fan:', dName);
+
+        const accessory = new this.api.platformAccessory(dName, uuid);
+        accessory.context.device = device;
+        new DaikinOnePlusOneCleanFan(this, accessory, device.id, this.daikinApi);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+    } else if (existingAccessory) {
+      //Delete any existing one clean fan
+      this.log.info('Removing one clean fan from cache:', existingAccessory.displayName);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }
 

@@ -227,6 +227,11 @@ export class DaikinApi{
       return device.data.mode;
     }
 
+    getOneCleanFanActive(deviceId: string): boolean {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.oneCleanFanActive;
+    }
+
     getTargetTemp(deviceId: string): number {
       const device = this._devices.find(e=>e.id===deviceId);
       switch(device.data.mode){
@@ -381,6 +386,25 @@ export class DaikinApi{
           return true; 
         })
         .catch((error) => this.logError('Error updating target state:', error));
+    }
+
+    async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
+      this.log(LoggerLevel.DEBUG, `setOneCleanFanActive-> device:${deviceId}; state:${requestedState}`);
+      const requestedData = {oneCleanFanActive: requestedState};
+
+      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`,
+        requestedData, {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this._token.accessToken}`,
+          },
+        })
+        .then(res => {
+          this.log(LoggerLevel.DEBUG, 'setOneCleanFanActive-> response: ', res.data);
+          return true;
+        })
+        .catch((error) => this.logError('Error updating one clean fan:', error));
     }
 
     async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{

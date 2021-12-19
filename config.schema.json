@@ -72,6 +72,12 @@
         "description": "Enable switch to get/set the Away state of thermostats found in Daikin account.",
         "type": "boolean",
         "default": false
+      },
+      "enableOneCleanFan": {
+        "title": "Enable One Clean Fan",
+        "description": "Enable fan that allows the user to run one clean.",
+        "type": "boolean",
+        "default": false
       }
     }
   },
@@ -111,7 +117,8 @@
         "ignoreOutdoorAqi",
         "ignoreIndoorHumSensor",
         "ignoreOutdoorHumSensor",
-        "enableAwaySwitch"
+        "enableAwaySwitch",
+        "enableOneCleanFan"
       ]
     }]
 }
