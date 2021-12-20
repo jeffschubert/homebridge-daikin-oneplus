@@ -57,7 +57,6 @@ export class DaikinApi{
     constructor(
         private readonly user : string,
         private readonly password : string,
-        private readonly refreshInterval : number,
         private readonly log : LogMessage,
     ){
 
@@ -118,7 +117,7 @@ export class DaikinApi{
         this.log(LoggerLevel.DEBUG, 'Notifying all listeners');
         this.notifyListeners();
       });
-      this.log(LoggerLevel.DEBUG, 'Updated data.');
+      this.log(LoggerLevel.INFO, 'Updated data.');
 
       this._nextUpdateTimeMs = -1;
       this._scheduleUpdate();
@@ -241,7 +240,7 @@ export class DaikinApi{
       this._tokenExpiration.setSeconds(
         this._tokenExpiration.getSeconds() 
       + this._token.accessTokenExpiresIn 
-      - this.refreshInterval);
+      - DAIKIN_DEVICE_BACKGROUND_REFRESH_MS*2);
     }
 
     getDevices(){

@@ -23,14 +23,6 @@
         "type": "string",
         "required": true
       },
-      "refreshInterval": {
-        "title": "Refresh interval (seconds)",
-        "type": "integer",
-        "default": 10,
-        "minimum": 1,
-        "maximum": 60,
-        "required": true
-      },
       "includeDeviceName": {
         "title": "Include Device Name",
         "description": "Include device name as part of the default sensor name.",
@@ -105,8 +97,7 @@
           "type": "flex",
           "flex-flow": "column",
           "items": [
-            "name",
-            "refreshInterval"
+            "name"
           ]
         }
       ]
