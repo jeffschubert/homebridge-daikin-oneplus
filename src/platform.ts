@@ -162,6 +162,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
         // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing emergency heat switch from cache:', existingAccessory.displayName);
         new DaikinOnePlusEmergencyHeatSwitch(this, existingAccessory, device.id, this.daikinApi);
       } else {
@@ -191,6 +192,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
         // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing one clean fan from cache:', existingAccessory.displayName);
         new DaikinOnePlusOneCleanFan(this, existingAccessory, device.id, this.daikinApi);
       } else {
