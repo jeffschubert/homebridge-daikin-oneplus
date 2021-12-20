@@ -1,5 +1,5 @@
 import { Service, PlatformAccessory, CharacteristicValue} from 'homebridge';
-import { DaikinApi } from './daikinapi';
+import { DaikinApi, TargetHeatingCoolingState } from './daikinapi';
 
 import { DaikinOnePlusPlatform } from './platform';
 
@@ -145,22 +145,22 @@ export class DaikinOnePlusThermostat {
    * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
    */
   handleTargetHeatingCoolingStateGet(): CharacteristicValue {
-    //“mode”: 2 is cool, 3 is auto, 1 is heat, 0 is off, emergency heat is 4
     // set this to a valid value for TargetHeatingCoolingState
     let currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
     const currentStatus = this.daikinApi.getTargetState(this.deviceId);
     // set this to a valid value for CurrentHeatingCoolingState
     switch(currentStatus){
-      case 1:
+      case TargetHeatingCoolingState.HEAT:
+      case TargetHeatingCoolingState.AUXILIARY_HEAT:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.HEAT;
         break;
-      case 2:
+      case TargetHeatingCoolingState.COOL:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.COOL;
         break;
-      case 3:
+      case TargetHeatingCoolingState.AUTO:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.AUTO;
         break;
-      case 0:
+      case TargetHeatingCoolingState.OFF:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
         break;
       default:
@@ -254,24 +254,22 @@ export class DaikinOnePlusThermostat {
   async handleTargetHeatingCoolingStateSet(value: CharacteristicValue) {
     this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TargetHeatingCoolingState:', value);
     this.TargetHeatingCoolingState = value;
-
-    //“mode”: 2 is cool, 3 is auto, 1 is heat, 0 is off, emergency heat is 4
   
     // set this to a valid value for TargetHeatingCoolingState
-    let requestedState = 0; //OFF
+    let requestedState = TargetHeatingCoolingState.OFF;
     // set this to a valid value for CurrentHeatingCoolingState
     switch(value){
       case this.platform.Characteristic.TargetHeatingCoolingState.HEAT:
-        requestedState = 1;
+        requestedState = TargetHeatingCoolingState.HEAT;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.COOL:
-        requestedState = 2;
+        requestedState = TargetHeatingCoolingState.COOL;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.AUTO:
-        requestedState = 3;
+        requestedState = TargetHeatingCoolingState.AUTO;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.OFF:
-        requestedState = 0;
+        requestedState = TargetHeatingCoolingState.OFF;
         break;
     }
   

@@ -19,6 +19,14 @@ export declare const enum LoggerLevel {
   DEBUG = 'debug'
 }
 
+export declare const enum TargetHeatingCoolingState {
+  OFF = 0,
+  HEAT = 1,
+  COOL = 2,
+  AUTO = 3,
+  AUXILIARY_HEAT = 4
+}
+
 export type LogMessage = (level: LoggerLevel, message: string, ...parameters: any[]) => void
 
 export class DaikinApi{
@@ -230,11 +238,11 @@ export class DaikinApi{
     getTargetTemp(deviceId: string): number {
       const device = this._devices.find(e=>e.id===deviceId);
       switch(device.data.mode){
-        case 1: //heat
-        case 4: //emrg heat
+        case TargetHeatingCoolingState.HEAT:
+        case TargetHeatingCoolingState.AUXILIARY_HEAT:
           return device.data.hspActive;
-        case 2: //cool
-        case 3: //auto
+        case TargetHeatingCoolingState.COOL:
+        case TargetHeatingCoolingState.AUTO:
         default:
           return device.data.cspActive;
       }
@@ -300,7 +308,8 @@ export class DaikinApi{
       let requestedData = {};
       let autoHsp = deviceData.hspHome;
       switch(deviceData.mode){
-        case 1: //heat
+        case TargetHeatingCoolingState.HEAT:
+        case TargetHeatingCoolingState.AUXILIARY_HEAT:
           if(deviceData.schedEnabled){
             requestedData = {
               schedOverride: 1, 
@@ -310,7 +319,7 @@ export class DaikinApi{
             requestedData = {hspHome: requestedTemp};
           }
           break;
-        case 2: //cool
+        case TargetHeatingCoolingState.COOL:
           if(deviceData.schedEnabled){
             requestedData = {
               schedOverride: 1, 
@@ -320,7 +329,7 @@ export class DaikinApi{
             requestedData = {cspHome: requestedTemp};
           }
           break;
-        case 3: //auto
+        case TargetHeatingCoolingState.AUTO:
           //In auto mode, also set heating set point if it would be too close to the requested temp
           autoHsp = deviceData.hspHome + deviceData.tempDeltaMin >= requestedTemp 
             ? requestedTemp - deviceData.tempDeltaMin 
@@ -341,9 +350,6 @@ export class DaikinApi{
             };
           }
           break;
-        case 4: //emrg heat
-          this.log(LoggerLevel.INFO, 'Device is in Emergency Heat. Unable to set target temp.');
-          return false;
         default:
           this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp.`);
           return false;
