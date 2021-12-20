@@ -78,6 +78,12 @@
         "description": "Enable switch to request auxiliary/emergency heat only",
         "type": "boolean",
         "default": false
+      },
+      "enableOneCleanFan": {
+        "title": "Enable One Clean Fan",
+        "description": "Enable fan that allows the user to run one clean.",
+        "type": "boolean",
+        "default": false
       }
     }
   },
@@ -118,7 +124,8 @@
         "ignoreIndoorHumSensor",
         "ignoreOutdoorHumSensor",
         "enableAwaySwitch",
-        "enableEmergencyHeatSwitch"
+        "enableEmergencyHeatSwitch",
+        "enableOneCleanFan"
       ]
     }]
 }
