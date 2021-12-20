@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosResponse } from 'axios';
+import { hrtime } from 'process';
 
 /**
  * Log levels to indicate importance of the logged message.
@@ -29,12 +30,29 @@ export declare const enum TargetHeatingCoolingState {
 
 export type LogMessage = (level: LoggerLevel, message: string, ...parameters: any[]) => void
 
+export type DataChanged = () => void
+
+// After sending an update to the Daikin API it will return old data for up to 15 seconds, so we
+// delay fetching data after an update by this amount. https://daikinone.com/openapi/documentation/
+export const DAIKIN_DEVICE_WRITE_DELAY_MS = 15*1000;
+
+// User is not interacting with a HomeKit controller - background updates for automations
+export const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180*1000;
+
+// User is interacting with a HomeKit controller - latest data needed
+export const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10*1000;
+
 export class DaikinApi{
     private _token;
-    private _locations;
     private _tokenExpiration;
-    private _devices;
+    private _devices: any[] | undefined; // cache of all devices (thermostats) and their state
     private _isInitialized = false;
+    private _listeners: Set<DataChanged> = new Set()
+
+    private _lastUpdateTimeMs = -1
+    private _nextUpdateTimeMs = -1
+    private _noUpdateBeforeMs = 0
+    private _updateTimeout?: NodeJS.Timeout
 
     constructor(
         private readonly user : string,
@@ -45,6 +63,20 @@ export class DaikinApi{
 
     }
 
+    public addListener(l: DataChanged) {
+      this._listeners.add(l);
+    }
+
+    public removeListener(l: DataChanged) {
+      this._listeners.delete(l);
+    }
+
+    private notifyListeners() {
+      for (const l of this._listeners) {
+        l();
+      }
+    }
+
     async Initialize(){
       await this.getToken();
       
@@ -53,21 +85,11 @@ export class DaikinApi{
         return;
       }
 
-      await this.getLocations();
       await this.getDevices();
-      
-      if(this._locations !== undefined){
-        this.log(LoggerLevel.INFO, `Found ${this._locations.length} location(s): `);
-        this._locations.forEach(element => {
-          this.log(LoggerLevel.INFO, `Location: ${element.name}`);
-        });
-      } else{
-        this.log(LoggerLevel.INFO, 'No locations found.');
-        return;
-      }
+
       if(this._devices !== undefined){
         this.log(LoggerLevel.INFO, `Found ${this._devices.length} device(s): `);
-        this._locations.forEach(element => {
+        this._devices.forEach(element => {
           this.log(LoggerLevel.INFO, `Device: ${element.name}`);
         });
       }else {
@@ -86,19 +108,100 @@ export class DaikinApi{
 
     async getData(){
       this.log(LoggerLevel.DEBUG, 'Getting data...');
-      this._devices.forEach(async device => {
+      this._devices && this._devices.forEach(async device => {
         const data = await this.getDeviceData(device.id);
         if(!data){
           this.log(LoggerLevel.ERROR, `Unable to retrieve data for ${device.name}.`);
           return;
         }
-        device.data = data;
+        this._updateCache(device.id, data);
+        this.log(LoggerLevel.DEBUG, 'Notifying all listeners');
+        this.notifyListeners();
       });
       this.log(LoggerLevel.DEBUG, 'Updated data.');
-        
-      setTimeout(async ()=>{
+
+      this._nextUpdateTimeMs = -1;
+      this._scheduleUpdate();
+    }
+
+    updateNow() {
+      this._scheduleUpdate(undefined, true);
+    }
+
+    /**
+     * Schedules the next update. The scheduler has 2 modes.
+     *
+     * ASAP:    Pull an update as soon as updates are neither blocked by a prior `blockUntilMs` value
+     *          nor by the maximum refresh frequency `DAIKIN_DEVICE_FOREGROUND_REFRESH_MS`.
+     *
+     * Regular: Pull an update every `DAIKIN_DEVICE_BACKGROUND_REFRESH_MS`.
+     *
+     * @param blockUntilMs If given and > 0 then no updates are guaranteed to take place in the next `blockFutureMs` miliseconds.
+     * @param asap perform update as soon as allowed by DAIKIN_DEVICE_FOREGROUND_REFRESH_MS
+     */
+    _scheduleUpdate(blockUntilMs?: number, asap = false) {
+      if (asap) {
+        if (blockUntilMs) {
+          this.log(LoggerLevel.ERROR, 'Ignoring blockFutureMs when scheduling ASAP');
+        }
+
+        const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
+        const minUntilNextUpdateMs = this._noUpdateBeforeMs-this._monotonic_clock_ms();
+        if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
+          if (minUntilNextUpdateMs <= 0) {
+            this.log(LoggerLevel.DEBUG, 'instant refresh now');
+            this._updateIn(0);
+          } else {
+            this.log(LoggerLevel.DEBUG, `instant refresh when update is allowed in ${minUntilNextUpdateMs}`);
+            this._updateIn(minUntilNextUpdateMs);
+          }
+        } else {
+          const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
+          const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
+          this.log(LoggerLevel.DEBUG, `next allowed poll in ${updateInMs}`);
+          this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
+        }
+
+        return;
+      }
+
+      let nextUpdateInMs:number;
+      if (!blockUntilMs) {
+        blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
+        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+      } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
+        this.log(LoggerLevel.ERROR, `blockFutureMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
+        blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
+        nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
+      } else {
+        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+      }
+      this._noUpdateBeforeMs = this._monotonic_clock_ms() + blockUntilMs;
+
+      const scheduledRunInMs = this._nextUpdateTimeMs - this._monotonic_clock_ms();
+      if (this._nextUpdateTimeMs === -1 || blockUntilMs > scheduledRunInMs) {
+        // if no run is scheduled at all OR if a run is scheduled for sooner than the desired minimum wait, push it into the future
+        this._updateIn(nextUpdateInMs);
+      } else {
+        // if the next update is already far enough in the future, nothing else to do
+        this.log(LoggerLevel.DEBUG, `not rescheduling next update because ${blockUntilMs} is after ${scheduledRunInMs}`);
+      }
+    }
+
+    private _updateIn(nextUpdateMs: number) {
+      if (this._updateTimeout) {
+        clearTimeout(this._updateTimeout);
+      }
+      this._updateTimeout = setTimeout(async () => {
+        this._lastUpdateTimeMs = this._monotonic_clock_ms();
         await this.getData();
-      }, this.refreshInterval*1000);
+      }, nextUpdateMs);
+      this._nextUpdateTimeMs = this._monotonic_clock_ms() + nextUpdateMs;
+      this.log(LoggerLevel.DEBUG, `scheduled update in ${nextUpdateMs}`);
+    }
+
+    private _monotonic_clock_ms(): number {
+      return Number(hrtime.bigint()/BigInt(1000000));
     }
 
     async getToken(){
@@ -139,11 +242,6 @@ export class DaikinApi{
         this._tokenExpiration.getSeconds() 
       + this._token.accessTokenExpiresIn 
       - this.refreshInterval);
-    }
-
-    getLocations(){
-      return this.getRequest('https://api.daikinskyport.com/locations')
-        .then((response)=>this._locations = response);
     }
 
     getDevices(){
@@ -212,7 +310,7 @@ export class DaikinApi{
     }
     
     deviceHasData(deviceId: string): boolean {
-      const device = this._devices.find(e=>e.id === deviceId);
+      const device = this._cachedDeviceById(deviceId);
       if(typeof device === 'undefined' ||
       typeof device.data === 'undefined'){
         return false;
@@ -221,27 +319,27 @@ export class DaikinApi{
     }
 
     getCurrentStatus(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.equipmentStatus;
     }
 
     getCurrentTemp(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.tempIndoor;
     }
 
     getTargetState(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.mode;
     }
 
     getOneCleanFanActive(deviceId: string): boolean {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.oneCleanFanActive;
     }
 
     getTargetTemp(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       switch(device.data.mode){
         case TargetHeatingCoolingState.HEAT:
         case TargetHeatingCoolingState.AUXILIARY_HEAT:
@@ -254,67 +352,67 @@ export class DaikinApi{
     }
 
     heatingThresholdTemperature(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.hspActive;
     }
 
     coolingThresholdTemperature(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.cspActive;
     }
 
     getCurrentHumidity(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.humIndoor;
     }
 
     getOutdoorHumidity(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.humOutdoor;
     }
 
     getTargetHumidity(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.humSP;
     }
 
     getAirQualityLevel(deviceId: string, forIndoor:boolean): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return forIndoor ? device.data.aqIndoorLevel : device.data.aqOutdoorLevel;
     }
 
     getOzone(deviceId: string, forIndoor:boolean): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return forIndoor ? 0 : device.data.aqOutdoorOzone;
     }
 
     getAirQualityValue(deviceId: string, forIndoor:boolean): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return forIndoor ? device.data.aqIndoorValue : device.data.aqOutdoorValue;
     }
 
     getPM2_5Density(deviceId: string, forIndoor:boolean): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return forIndoor ? device.data.aqIndoorParticlesValue : device.data.aqOutdoorParticles;
     }
 
     getVocDensity(deviceId: string, forIndoor:boolean): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return forIndoor ? device.data.aqIndoorVOCValue : 0;
     }
 
     getDisplayUnits(deviceId: string): number {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.units;
     }
 
     getAwayState(deviceId: string): boolean {
-      const device = this._devices.find(e=>e.id===deviceId);
+      const device = this._cachedDeviceById(deviceId);
       return device.data.geofencingAway && device.data.geofencingEnabled;
     }
 
     async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean>{
-      const deviceData = await this.getDeviceData(deviceId);
+      const deviceData = this._cachedDeviceById(deviceId)?.data;
       if(!deviceData){
         this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set target temp.');
         return false;
@@ -359,6 +457,8 @@ export class DaikinApi{
         })
         .then(res => {
           this.log(LoggerLevel.DEBUG, 'setTargetTemp-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
         .catch((error) => this.logError('Error updating target temp: ', error));
@@ -378,6 +478,8 @@ export class DaikinApi{
         })
         .then(res => {
           this.log(LoggerLevel.DEBUG, 'setTargetState-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true; 
         })
         .catch((error) => this.logError('Error updating target state:', error));
@@ -397,6 +499,8 @@ export class DaikinApi{
         })
         .then(res => {
           this.log(LoggerLevel.DEBUG, 'setOneCleanFanActive-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
         .catch((error) => this.logError('Error updating one clean fan:', error));
@@ -416,6 +520,8 @@ export class DaikinApi{
         })
         .then(res => {
           this.log(LoggerLevel.DEBUG, 'setDisplayUnits-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
         .catch((error) => this.logError('Error updating target state:', error));
@@ -433,14 +539,16 @@ export class DaikinApi{
           },
         })
         .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setTargetState-> response: ', res.data);
+          this.log(LoggerLevel.DEBUG, 'setTargetHumidity-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
         .catch((error) => this.logError('Error updating target humidity:', error));
     }
 
     async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
-      const deviceData = await this.getDeviceData(deviceId);
+      const deviceData = this._cachedDeviceById(deviceId)?.data;
       if(!deviceData){
         this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set away state.');
         return false;
@@ -475,9 +583,32 @@ export class DaikinApi{
         })
         .then(res => {
           this.log(LoggerLevel.DEBUG, 'setAwayState-> response: ', res.data);
+          this._updateCache(deviceId, requestedData);
+          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
         .catch((error) => this.logError('Error updating away state: ', error));
+    }
+
+    private _updateCache(deviceId: string, partialUpdate: any) {
+      const cachedDevice = this._cachedDeviceById(deviceId);
+      if (cachedDevice) {
+        const updatedData = {
+          ...cachedDevice.data,
+          ...partialUpdate,
+        };
+        cachedDevice.data = updatedData;
+        this.log(LoggerLevel.DEBUG, `Updated cache for ${deviceId} - ${cachedDevice.data.hspHome}`);
+      } else {
+        this.log(LoggerLevel.ERROR, `Cache update for device that doesn't exist ${deviceId}`);
+      }
+    }
+
+    private _cachedDeviceById(deviceId: string) {
+      if (!this._devices) {
+        return undefined;
+      }
+      return this._devices.find(e => e.id === deviceId);
     }
 
     logError(message: string, error): boolean{

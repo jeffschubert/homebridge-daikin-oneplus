@@ -35,14 +35,19 @@ export class DaikinOnePlusEmergencyHeatSwitch {
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
 
     this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onGet(this.handleCurrentStateGet.bind(this))
+      .onGet(() => {
+        this.daikinApi.updateNow();
+        return this.handleCurrentStateGet();
+      })
       .onSet(this.handleCurrentStateSet.bind(this));
+
+    this.updateValues();
+    this.daikinApi.addListener(this.updateValues.bind(this));
   }
 
   updateValues() {
     const value = this.handleCurrentStateGet();
     this.service.updateCharacteristic(this.platform.Characteristic.On, value);
-    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**

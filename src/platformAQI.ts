@@ -34,6 +34,7 @@ export class DaikinOnePlusAQSensor {
     // set the service name, this is what is displayed as the default name on the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
     this.updateValues();
+    this.daikinApi.addListener(this.updateValues.bind(this));
   }
 
   updateValues() {
@@ -55,8 +56,6 @@ export class DaikinOnePlusAQSensor {
     } else{
       this.platform.log.info('AQI', this.accessory.displayName, '- Waiting for data...');
     }
-      
-    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**
