@@ -253,6 +253,16 @@ export class DaikinApi{
       }
     }
 
+    heatingThresholdTemperature(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.hspActive;
+    }
+
+    coolingThresholdTemperature(deviceId: string): number {
+      const device = this._devices.find(e=>e.id===deviceId);
+      return device.data.cspActive;
+    }
+
     getCurrentHumidity(deviceId: string): number {
       const device = this._devices.find(e=>e.id===deviceId);
       return device.data.humIndoor;
@@ -303,63 +313,42 @@ export class DaikinApi{
       return device.data.geofencingAway && device.data.geofencingEnabled;
     }
 
-    async setTargetTemp(deviceId: string, requestedTemp: number): Promise<boolean>{
+    async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean>{
       const deviceData = await this.getDeviceData(deviceId);
       if(!deviceData){
         this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set target temp.');
         return false;
       }
 
-      let requestedData = {};
-      let autoHsp = deviceData.hspHome;
-      switch(deviceData.mode){
+      let requestedData;
+      switch (deviceData.mode) {
         case TargetHeatingCoolingState.HEAT:
         case TargetHeatingCoolingState.AUXILIARY_HEAT:
-          if(deviceData.schedEnabled){
-            requestedData = {
-              schedOverride: 1, 
-              hspHome: requestedTemp,
-            };
-          } else{
-            requestedData = {hspHome: requestedTemp};
-          }
+          requestedData = {
+            hspHome: targetTemp || heatThreshold,
+          };
           break;
         case TargetHeatingCoolingState.COOL:
-          if(deviceData.schedEnabled){
-            requestedData = {
-              schedOverride: 1, 
-              cspHome: requestedTemp,
-            };
-          } else{
-            requestedData = {cspHome: requestedTemp};
-          }
+          requestedData = {
+            cspHome: targetTemp || coolThreshold,
+          };
           break;
         case TargetHeatingCoolingState.AUTO:
-          //In auto mode, also set heating set point if it would be too close to the requested temp
-          autoHsp = deviceData.hspHome + deviceData.tempDeltaMin >= requestedTemp 
-            ? requestedTemp - deviceData.tempDeltaMin 
-            : deviceData.hspHome;
-          //TODO: Come up with a way to detect when the requestedTemp is intended by the user to be the heating set point instead.
-          // i.e. it is winter and they're wanting to make it warmer instead of cooler. Daikin app allows setting both in auto mode
-          //   but HomeKit only allows setting a single temp
-          if(deviceData.schedEnabled){
-            requestedData = {
-              schedOverride: 1, 
-              cspHome: requestedTemp,
-              hspHome: autoHsp,
-            };
-          } else{
-            requestedData = {
-              cspHome: requestedTemp,
-              hspHome: autoHsp,
-            };
-          }
+          requestedData = {
+            hspHome: heatThreshold,
+            cspHome: coolThreshold,
+          };
           break;
         default:
           this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp.`);
           return false;
       }
-      this.log(LoggerLevel.DEBUG, 'setTargetTemp-> requestedData: ', requestedData);
+
+      if(deviceData.schedEnabled){
+        requestedData.schedOverride = 1;
+      }
+
+      this.log(LoggerLevel.DEBUG, 'setTargetTemps-> requestedData: ', requestedData);
       return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
         requestedData, {
           headers: {
