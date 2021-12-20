@@ -35,12 +35,14 @@ export class DaikinOnePlusOneCleanFan {
     this.service.getCharacteristic(this.platform.Characteristic.Active)
       .onGet(this.handleActiveGet.bind(this))
       .onSet(this.handleActiveSet.bind(this));
+
+    this.updateValues();
+    this.daikinApi.addListener(this.updateValues.bind(this));
   }
 
   updateValues() {
     const value = this.handleActiveGet();
     this.service.updateCharacteristic(this.platform.Characteristic.Active, value);
-    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**

@@ -41,6 +41,7 @@ export class DaikinOnePlusAwaySwitch {
       .onSet(this.handleCurrentStateSet.bind(this));
 
     this.updateValues();
+    this.daikinApi.addListener(this.updateValues.bind(this));
   }
 
   updateValues() {
@@ -55,8 +56,6 @@ export class DaikinOnePlusAwaySwitch {
     } else{
       this.platform.log.info('Away', this.accessory.displayName, '- Waiting for data...');
     }
-      
-    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**

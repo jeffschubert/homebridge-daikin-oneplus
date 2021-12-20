@@ -61,6 +61,8 @@ export class DaikinOnePlusThermostat {
       
     this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
       .onGet(()=>{
+        this.platform.log.info(`GET CHAR TARGET TEMP - ${this.accessory.displayName}` );
+        this.daikinApi.updateNow();
         return this.TargetTemperature!;
       })
       .onSet(this.handleTargetTemperatureSet.bind(this))
@@ -106,7 +108,9 @@ export class DaikinOnePlusThermostat {
         return this.TargetRelativeHumidity!;
       })
       .onSet(this.handleTargetHumiditySet.bind(this));
+
     this.updateValues();
+    this.daikinApi.addListener(this.updateValues.bind(this));
   }
 
   updateValues() {
@@ -173,7 +177,6 @@ export class DaikinOnePlusThermostat {
     } else{
       this.platform.log.info('Thermostat', this.accessory.displayName, '- Waiting for data...');
     }
-    setTimeout(()=>this.updateValues(), 2000);
   }
 
   /**
