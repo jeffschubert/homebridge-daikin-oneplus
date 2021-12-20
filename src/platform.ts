@@ -220,6 +220,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
         // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing away switch from cache:', existingAccessory.displayName);
         new DaikinOnePlusAwaySwitch(this, existingAccessory, device.id, this.daikinApi, dName);
       } else {
@@ -250,6 +251,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         if (existingAccessory) {
         // the accessory already exists
           existingAccessory.displayName = dName;
+          existingAccessory.context.device = device;
           this.log.info('Restoring existing indoor Air Quality sensor from cache:', existingAccessory.displayName);
           new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, true, dName);
         } else {
@@ -285,6 +287,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         if (existingAccessory) {
         // the accessory already exists
           existingAccessory.displayName = dName;
+          existingAccessory.context.device = device;
           this.log.info('Restoring existing outdoor Air Quality sensor from cache:', existingAccessory.displayName);
           new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, false, dName);
         } else {
@@ -317,6 +320,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
       // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing indoor humidity sensor from cache:', existingAccessory.displayName);
         new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, true);
       } else {
@@ -346,6 +350,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
       // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing outdoor humidity sensor from cache:', existingAccessory.displayName);
         new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, false);
       } else {
@@ -374,6 +379,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       if (existingAccessory) {
         // the accessory already exists
         existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
         this.log.info('Restoring existing thermostat from cache:', existingAccessory.displayName);
         new DaikinOnePlusThermostat(this, existingAccessory, device.id, this.daikinApi);
       } else {
