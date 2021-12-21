@@ -167,20 +167,20 @@ export class DaikinApi{
       let nextUpdateInMs:number;
       if (!blockUntilMs) {
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
-        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+        nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
       } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
         this.log(LoggerLevel.ERROR, `blockFutureMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
         nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       } else {
-        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+        nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
       }
       this._noUpdateBeforeMs = this._monotonic_clock_ms() + blockUntilMs;
 
       const scheduledRunInMs = this._nextUpdateTimeMs - this._monotonic_clock_ms();
       if (this._nextUpdateTimeMs === -1 || blockUntilMs > scheduledRunInMs) {
         // if no run is scheduled at all OR if a run is scheduled for sooner than the desired minimum wait, push it into the future
-        this._updateIn(nextUpdateInMs);
+        this._updateIn(blockUntilMs > nextUpdateInMs ? blockUntilMs : nextUpdateInMs);
       } else {
         // if the next update is already far enough in the future, nothing else to do
         this.log(LoggerLevel.DEBUG, `not rescheduling next update because ${blockUntilMs} is after ${scheduledRunInMs}`);
