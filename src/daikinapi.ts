@@ -136,13 +136,13 @@ export class DaikinApi{
      *
      * Regular: Pull an update every `DAIKIN_DEVICE_BACKGROUND_REFRESH_MS`.
      *
-     * @param blockUntilMs If given and > 0 then no updates are guaranteed to take place in the next `blockFutureMs` miliseconds.
+     * @param blockUntilMs If given and > 0 then no updates are guaranteed to take place in the next `blockUntilMs` milliseconds.
      * @param asap perform update as soon as allowed by DAIKIN_DEVICE_FOREGROUND_REFRESH_MS
      */
     _scheduleUpdate(blockUntilMs?: number, asap = false) {
       if (asap) {
         if (blockUntilMs) {
-          this.log(LoggerLevel.ERROR, 'Ignoring blockFutureMs when scheduling ASAP');
+          this.log(LoggerLevel.ERROR, 'Ignoring blockUntilMs when scheduling ASAP');
         }
 
         const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
@@ -170,7 +170,7 @@ export class DaikinApi{
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
         nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
       } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
-        this.log(LoggerLevel.ERROR, `blockFutureMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
+        this.log(LoggerLevel.ERROR, `blockUntilMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
         nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       } else {
@@ -184,7 +184,7 @@ export class DaikinApi{
         this._updateIn(nextUpdateInMs);
       } else {
         // if the next update is already far enough in the future, nothing else to do
-        this.log(LoggerLevel.INFO, `not rescheduling because ${blockUntilMs} is after ${scheduledRunInMs}`);
+        this.log(LoggerLevel.INFO, `not rescheduling because ${scheduledRunInMs} is after ${blockUntilMs}`);
       }
     }
 
