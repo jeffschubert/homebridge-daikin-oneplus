@@ -3,7 +3,7 @@
   "pluginType": "platform",
   "singular": true,
   "headerDisplay": "All devices associated with the configured Daikin account will be loaded as accessories.\nYou must have a Daikin One+ Smart Thermostat and Daikin cloud account for this plugin to work.",
-  "footerDisplay": "",
+  "footerDisplay": "See the [homebridge-daikin-oneplus](https://github.com/jeffschubert/homebridge-daikin-oneplus) developer page for detailed documentation, and to submit feature requests and bug reports.",
   "schema": {
     "type": "object",
     "properties": {
