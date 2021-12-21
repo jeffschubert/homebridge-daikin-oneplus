@@ -57,7 +57,6 @@ export class DaikinApi{
     constructor(
         private readonly user : string,
         private readonly password : string,
-        private readonly refreshInterval : number,
         private readonly log : LogMessage,
     ){
 
@@ -146,19 +145,19 @@ export class DaikinApi{
         }
 
         const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
-        const minUntilNextUpdateMs = this._monotonic_clock_ms()-this._noUpdateBeforeMs;
+        const minUntilNextUpdateMs = this._noUpdateBeforeMs-this._monotonic_clock_ms();
         if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
           if (minUntilNextUpdateMs <= 0) {
+            this.log(LoggerLevel.DEBUG, 'instant refresh now');
             this._updateIn(0);
-            this.log(LoggerLevel.INFO, 'instant refresh now');
           } else {
+            this.log(LoggerLevel.DEBUG, `instant refresh when update is allowed in ${minUntilNextUpdateMs}`);
             this._updateIn(minUntilNextUpdateMs);
-            this.log(LoggerLevel.ERROR, `instant refresh when update is allowed in ${minUntilNextUpdateMs}`);
           }
         } else {
           const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
           const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
-          this.log(LoggerLevel.INFO, `next allowed poll in ${updateInMs}`);
+          this.log(LoggerLevel.DEBUG, `next allowed poll in ${updateInMs}`);
           this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
         }
 
@@ -168,23 +167,23 @@ export class DaikinApi{
       let nextUpdateInMs:number;
       if (!blockUntilMs) {
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
-        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+        nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
       } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
         this.log(LoggerLevel.ERROR, `blockUntilMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
         blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
         nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       } else {
-        nextUpdateInMs = asap ? DAIKIN_DEVICE_FOREGROUND_REFRESH_MS : DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+        nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
       }
       this._noUpdateBeforeMs = this._monotonic_clock_ms() + blockUntilMs;
 
       const scheduledRunInMs = this._nextUpdateTimeMs - this._monotonic_clock_ms();
       if (this._nextUpdateTimeMs === -1 || blockUntilMs > scheduledRunInMs) {
         // if no run is scheduled at all OR if a run is scheduled for sooner than the desired minimum wait, push it into the future
-        this._updateIn(nextUpdateInMs);
+        this._updateIn(blockUntilMs > nextUpdateInMs ? blockUntilMs : nextUpdateInMs);
       } else {
         // if the next update is already far enough in the future, nothing else to do
-        this.log(LoggerLevel.INFO, `not rescheduling because ${scheduledRunInMs} is after ${blockUntilMs}`);
+        this.log(LoggerLevel.DEBUG, `not rescheduling next update because ${blockUntilMs} is after ${scheduledRunInMs}`);
       }
     }
 
@@ -193,11 +192,11 @@ export class DaikinApi{
         clearTimeout(this._updateTimeout);
       }
       this._updateTimeout = setTimeout(async () => {
-        await this.getData();
         this._lastUpdateTimeMs = this._monotonic_clock_ms();
+        await this.getData();
       }, nextUpdateMs);
       this._nextUpdateTimeMs = this._monotonic_clock_ms() + nextUpdateMs;
-      this.log(LoggerLevel.INFO, `scheduled update in ${nextUpdateMs}`);
+      this.log(LoggerLevel.DEBUG, `scheduled update in ${nextUpdateMs}`);
     }
 
     private _monotonic_clock_ms(): number {
@@ -241,7 +240,7 @@ export class DaikinApi{
       this._tokenExpiration.setSeconds(
         this._tokenExpiration.getSeconds() 
       + this._token.accessTokenExpiresIn 
-      - this.refreshInterval);
+      - DAIKIN_DEVICE_BACKGROUND_REFRESH_MS*2);
     }
 
     getDevices(){

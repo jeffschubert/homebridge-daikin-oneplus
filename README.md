@@ -31,7 +31,6 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "name": "Daikin One+",        // Required. The name of the thermostat. Can be anything.
     "user": "any@email.address",  // Required. The email of your Daikin One+ account.
     "password": "password",       // Required.
-    "refreshInterval": 10,        // Required. The interval (in seconds) at which the plugin should get current values from the Daikin API.
     "includeDeviceName": false,   // Required. Should the default sensor names start with the thermostat name (as configured in the thermostat).
   }
 ]

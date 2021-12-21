@@ -61,7 +61,7 @@ export class DaikinOnePlusThermostat {
       
     this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
       .onGet(()=>{
-        this.platform.log.info(`GET CHAR TARGET TEMP - ${this.accessory.displayName}` );
+        this.platform.log.debug(`Thermostat getCharacteristic TargetTemperature - ${this.accessory.displayName}` );
         this.daikinApi.updateNow();
         return this.TargetTemperature!;
       })

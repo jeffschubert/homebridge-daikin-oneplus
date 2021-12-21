@@ -33,7 +33,10 @@ export class DaikinOnePlusOneCleanFan {
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
 
     this.service.getCharacteristic(this.platform.Characteristic.Active)
-      .onGet(this.handleActiveGet.bind(this))
+      .onGet(() => {
+        this.daikinApi.updateNow();
+        return this.handleActiveGet();
+      })
       .onSet(this.handleActiveSet.bind(this));
 
     this.updateValues();
