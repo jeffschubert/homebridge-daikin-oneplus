@@ -406,7 +406,7 @@ export class DaikinOnePlusThermostat {
   }
 
   /**
-   * Handle requests to set the "Target Temperature" characteristic
+   * Handle requests to set the "Target Humidity" characteristic
    */
   async handleTargetHumiditySet(value: CharacteristicValue) {
     this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TargetHumidity:', value);
