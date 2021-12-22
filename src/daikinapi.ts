@@ -117,7 +117,7 @@ export class DaikinApi{
         this.log(LoggerLevel.DEBUG, 'Notifying all listeners');
         this.notifyListeners();
       });
-      this.log(LoggerLevel.INFO, 'Updated data.');
+      this.log(LoggerLevel.DEBUG, 'Updated data.');
 
       this._nextUpdateTimeMs = -1;
       this._scheduleUpdate();
