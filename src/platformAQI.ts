@@ -4,9 +4,9 @@ import { DaikinApi } from './daikinapi';
 import { DaikinOnePlusPlatform } from './platform';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Air Quality Sensor
+ * Sensor to set or get air quality values. Handles both indoor and outdoor sensors.
+ * Assumes PM2_5Density for particle density as actual units Daikin uses are unknown.
  */
 export class DaikinOnePlusAQSensor {
   private service: Service;
@@ -17,7 +17,6 @@ export class DaikinOnePlusAQSensor {
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
     private readonly forIndoor: boolean,
-    private readonly displayName: string,
   ) {
 
     // set accessory information
@@ -33,6 +32,31 @@ export class DaikinOnePlusAQSensor {
 
     // set the service name, this is what is displayed as the default name on the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
+
+    this.service.getCharacteristic(this.platform.Characteristic.AirQuality)
+      .onGet(()=>{
+        this.daikinApi.updateNow();
+        return this.handleAirQualityGet();
+      });
+    this.service.getCharacteristic(this.platform.Characteristic.PM2_5Density)
+      .onGet(()=>{
+        this.daikinApi.updateNow();
+        return this.handlePM2_5DensityGet();
+      });
+    if(this.forIndoor){
+      this.service.getCharacteristic(this.platform.Characteristic.VOCDensity)
+        .onGet(()=>{
+          this.daikinApi.updateNow();
+          return this.handleVocDensityGet();
+        });
+    } else{
+      this.service.getCharacteristic(this.platform.Characteristic.OzoneDensity)
+        .onGet(()=>{
+          this.daikinApi.updateNow();
+          return this.handleOzoneGet();
+        });
+    }
+
     this.updateValues();
     this.daikinApi.addListener(this.updateValues.bind(this));
   }
@@ -41,20 +65,15 @@ export class DaikinOnePlusAQSensor {
     // push the new value to HomeKit
     if(this.daikinApi.deviceHasData(this.deviceId)){
       this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, this.handleAirQualityGet());
-      if(!this.forIndoor){
+      if(this.forIndoor){
+        this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
+      } else{
         this.service.updateCharacteristic(this.platform.Characteristic.OzoneDensity, this.handleOzoneGet());
       }
       const aqValue = this.handleAirQualityValueGet();
-      this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.displayName} ${aqValue}`);
+      this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.accessory.displayName} ${aqValue}`);
 
       this.service.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.handlePM2_5DensityGet());
-
-      if(this.forIndoor){
-        this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
-      }
-      this.platform.log.debug('AQI', this.accessory.displayName, '- Updated AQI characteristics...');
-    } else{
-      this.platform.log.info('AQI', this.accessory.displayName, '- Waiting for data...');
     }
   }
 
@@ -79,7 +98,7 @@ export class DaikinOnePlusAQSensor {
         currentValue = this.platform.Characteristic.AirQuality.POOR;
         break;
     }
-    this.platform.log.debug('AQI', this.accessory.displayName, '- Get AirQuality:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get AirQuality:', currentValue);
     return currentValue;
   }
   
@@ -93,7 +112,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug('AQI', this.accessory.displayName, '- Get Ozone:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get Ozone:', currentValue);
     return currentValue;
   }
   
@@ -108,7 +127,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 500) {
       currentValue = 500;
     }
-    this.platform.log.debug('AQI', this.accessory.displayName, '- Get AirQualityValue:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get AirQualityValue:', currentValue);
     return currentValue;
   }
   
@@ -123,7 +142,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug('AQI', this.accessory.displayName, '- Get PM2_5Density:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get PM2_5Density:', currentValue);
     return currentValue;
   }
   
@@ -138,7 +157,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug('AQI', this.accessory.displayName, '- Get Voc Density:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get Voc Density:', currentValue);
     return currentValue;
   }
 }

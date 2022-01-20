@@ -216,14 +216,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         existingAccessory.displayName = dName;
         existingAccessory.context.device = device;
         this.log.info('Restoring existing away switch from cache:', existingAccessory.displayName);
-        new DaikinOnePlusAwaySwitch(this, existingAccessory, device.id, this.daikinApi, dName);
+        new DaikinOnePlusAwaySwitch(this, existingAccessory, device.id, this.daikinApi);
       } else {
         // the accessory does not yet exist, so we need to create it
         this.log.info('Adding new away switch:', dName);
 
         const accessory = new this.api.platformAccessory(dName, uuid);
         accessory.context.device = device;
-        new DaikinOnePlusAwaySwitch(this, accessory, device.id, this.daikinApi, dName);
+        new DaikinOnePlusAwaySwitch(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     } else if (existingAccessory) {
@@ -247,14 +247,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           existingAccessory.displayName = dName;
           existingAccessory.context.device = device;
           this.log.info('Restoring existing indoor Air Quality sensor from cache:', existingAccessory.displayName);
-          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, true, dName);
+          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, true);
         } else {
         // the accessory does not yet exist, so we need to create it
           this.log.info('Adding new indoor Air Quality sensor:', dName);
 
           const accessory = new this.api.platformAccessory(dName, uuid);
           accessory.context.device = device;
-          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, true, dName);
+          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, true);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         }
       } else if (existingAccessory) {
@@ -283,14 +283,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           existingAccessory.displayName = dName;
           existingAccessory.context.device = device;
           this.log.info('Restoring existing outdoor Air Quality sensor from cache:', existingAccessory.displayName);
-          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, false, dName);
+          new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, false);
         } else {
         // the accessory does not yet exist, so we need to create it
           this.log.info('Adding new outdoor Air Quality sensor:', dName);
 
           const accessory = new this.api.platformAccessory(dName, uuid);
           accessory.context.device = device;
-          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, false, dName);
+          new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, false);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         }
       } else if (existingAccessory) {

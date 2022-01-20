@@ -11,7 +11,6 @@ import { DaikinOnePlusPlatform } from './platform';
  */
 export class DaikinOnePlusEmergencyHeatSwitch {
   private service: Service;
-  CurrentState!: CharacteristicValue;
   
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
@@ -54,17 +53,19 @@ export class DaikinOnePlusEmergencyHeatSwitch {
    * Handle requests to get the current value of the "On" characteristic
    */
   handleCurrentStateGet(): boolean {
-    return (
+    const currentState = (
       this.daikinApi.deviceHasData(this.deviceId) &&
       this.daikinApi.getTargetState(this.deviceId) === TargetHeatingCoolingState.AUXILIARY_HEAT
     );
+    this.platform.log.debug(this.accessory.displayName, '- Get Emergency Heat State:', currentState);
+    return currentState;
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
-    this.platform.log.debug('Emergency Heat', this.accessory.displayName, '- Set Emergency Heat State:', value);
+    this.platform.log.debug(this.accessory.displayName, '- Set Emergency Heat State:', value);
     await this.daikinApi.setTargetState(this.deviceId, value ? TargetHeatingCoolingState.AUXILIARY_HEAT : TargetHeatingCoolingState.HEAT);
   }
   

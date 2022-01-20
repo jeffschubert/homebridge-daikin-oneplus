@@ -10,14 +10,12 @@ import { DaikinOnePlusPlatform } from './platform';
  */
 export class DaikinOnePlusAwaySwitch {
   private service: Service;
-  CurrentState!: CharacteristicValue;
   
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
-    private readonly displayName: string,
   ) {
 
     // set accessory information
@@ -36,7 +34,8 @@ export class DaikinOnePlusAwaySwitch {
 
     this.service.getCharacteristic(this.platform.Characteristic.On)
       .onGet(()=>{
-        return this.CurrentState!;
+        this.daikinApi.updateNow();
+        return this.handleCurrentStateGet();
       })
       .onSet(this.handleCurrentStateSet.bind(this));
 
@@ -45,40 +44,23 @@ export class DaikinOnePlusAwaySwitch {
   }
 
   updateValues() {
-    // push the new value to HomeKit
-    if(this.daikinApi.deviceHasData(this.deviceId)){
-      this.CurrentState = this.handleCurrentStateGet();
-      this.service.updateCharacteristic(this.platform.Characteristic.On, this.handleCurrentStateGet());
-      if (this.CurrentState !== undefined) {
-        this.service.updateCharacteristic(this.platform.Characteristic.On, this.CurrentState);
-      }
-      this.platform.log.debug('Away', this.accessory.displayName, '- Updated Away characteristics...');
-    } else{
-      this.platform.log.info('Away', this.accessory.displayName, '- Waiting for data...');
-    }
+    const value = this.handleCurrentStateGet();
+    this.service.updateCharacteristic(this.platform.Characteristic.On, value);
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
   handleCurrentStateGet(): boolean {
-    const currentAwayState = this.daikinApi.getAwayState(this.deviceId);
-
-    let currentValue = false;
-    if(currentAwayState === true){
-      currentValue = true;
-    }
-
-    this.platform.log.debug('Away', this.accessory.displayName, '- Get Away State:', currentValue);
-    return currentValue;
+    return this.daikinApi.deviceHasData(this.deviceId) &&
+        this.daikinApi.getAwayState(this.deviceId);
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
-    this.platform.log.debug('Away', this.accessory.displayName, '- Set Away State:', value);
-    this.CurrentState = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set Away State:', value);
     await this.daikinApi.setAwayState(this.deviceId, Boolean(value));
   }
   

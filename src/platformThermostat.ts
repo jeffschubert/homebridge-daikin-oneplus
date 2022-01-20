@@ -4,23 +4,11 @@ import { DaikinApi, TargetHeatingCoolingState } from './daikinapi';
 import { DaikinOnePlusPlatform } from './platform';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Thermostat
+ * Exposes thermostat related characteristics for the Daikin One+ thermostat.
  */
 export class DaikinOnePlusThermostat {
   private service: Service;
-
-  //Thermostat characteristics
-  CurrentHeatingCoolingState!: CharacteristicValue;
-  TargetHeatingCoolingState!: CharacteristicValue;
-  CurrentTemperature!: CharacteristicValue;
-  TargetTemperature!: CharacteristicValue;
-  CoolingThresholdTemperature!: CharacteristicValue;
-  HeatingThresholdTemperature!: CharacteristicValue;
-  TemperatureDisplayUnits!: CharacteristicValue;
-  CurrentRelativeHumidity!: CharacteristicValue;
-  TargetRelativeHumidity!: CharacteristicValue;
 
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
@@ -45,25 +33,27 @@ export class DaikinOnePlusThermostat {
     
     this.service.getCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState)
       .onGet(()=>{
-        return this.CurrentHeatingCoolingState!;
+        this.daikinApi.updateNow();
+        return this.handleCurrentHeatingCoolingStateGet();
       });
       
     this.service.getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
       .onGet(()=>{
-        return this.TargetHeatingCoolingState!;
+        this.daikinApi.updateNow();
+        return this.handleTargetHeatingCoolingStateGet();
       })
       .onSet(this.handleTargetHeatingCoolingStateSet.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature)
       .onGet(()=>{
-        return this.CurrentTemperature!;
+        this.daikinApi.updateNow();
+        return this.handleCurrentTemperatureGet();
       });
       
     this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
       .onGet(()=>{
-        this.platform.log.debug(`Thermostat getCharacteristic TargetTemperature - ${this.accessory.displayName}` );
         this.daikinApi.updateNow();
-        return this.TargetTemperature!;
+        return this.handleTargetTemperatureGet();
       })
       .onSet(this.handleTargetTemperatureSet.bind(this))
       .setProps({
@@ -72,7 +62,8 @@ export class DaikinOnePlusThermostat {
 
     this.service.getCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature)
       .onGet(()=>{
-        return this.CoolingThresholdTemperature!;
+        this.daikinApi.updateNow();
+        return this.handleCoolingThresholdTemperatureGet();
       })
       .onSet(this.handleCoolingThresholdTemperatureSet.bind(this))
       .setProps({
@@ -83,7 +74,8 @@ export class DaikinOnePlusThermostat {
 
     this.service.getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
       .onGet(()=>{
-        return this.HeatingThresholdTemperature!;
+        this.daikinApi.updateNow();
+        return this.handleHeatingThresholdTemperatureGet();
       })
       .onSet(this.handleHeatingThresholdTemperatureSet.bind(this))
       .setProps({
@@ -94,18 +86,21 @@ export class DaikinOnePlusThermostat {
 
     this.service.getCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits)
       .onGet(()=>{
-        return this.TemperatureDisplayUnits!;
+        this.daikinApi.updateNow();
+        return this.handleTemperatureDisplayUnitsGet();
       })
       .onSet(this.handleTemperatureDisplayUnitsSet.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
       .onGet(()=>{
-        return this.CurrentRelativeHumidity!;
+        this.daikinApi.updateNow();
+        return this.handleCurrentHumidityGet();
       });
       
     this.service.getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)
       .onGet(()=>{
-        return this.TargetRelativeHumidity!;
+        this.daikinApi.updateNow();
+        return this.handleTargetHumidityGet();
       })
       .onSet(this.handleTargetHumiditySet.bind(this));
 
@@ -116,66 +111,49 @@ export class DaikinOnePlusThermostat {
   updateValues() {
     // push the new value to HomeKit
     if(this.daikinApi.deviceHasData(this.deviceId)){
-      this.CurrentHeatingCoolingState = this.handleCurrentHeatingCoolingStateGet();
-      this.TargetHeatingCoolingState = this.handleTargetHeatingCoolingStateGet();
-      this.CurrentTemperature = this.handleCurrentTemperatureGet();
-      this.TargetTemperature = this.handleTargetTemperatureGet();
-      this.HeatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
-      this.CoolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
-      this.TemperatureDisplayUnits = this.handleTemperatureDisplayUnitsGet();
-      this.CurrentRelativeHumidity = this.handleCurrentHumidityGet();
-      this.TargetRelativeHumidity = this.handleTargetHumidityGet();
+      const targetHeatingCoolingState = this.handleTargetHeatingCoolingStateGet();
+      const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
+      const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
 
-      if(this.CurrentHeatingCoolingState !== undefined){
-        this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.CurrentHeatingCoolingState);
-      }
-      if(this.TargetHeatingCoolingState !== undefined){
-        this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, this.TargetHeatingCoolingState);
-      }
-      if (this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, 
+        this.handleCurrentHeatingCoolingStateGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, 
+        targetHeatingCoolingState);
+
+      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
         this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
           .setProps({
             minValue: 10,
             maxValue: 30,
           });
       }
-      if (this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
+      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
         this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature)
           .setProps({
             minValue: 12,
             maxValue: 32,
           });
       }
-      if (this.CurrentTemperature !== undefined) {
-        this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.CurrentTemperature);
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, 
+        this.handleCurrentTemperatureGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, 
+        this.handleTargetTemperatureGet());
+
+      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
+          coolingThresholdTemperature !== undefined) {
+        this.service.updateCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature, coolingThresholdTemperature);
       }
-      if (this.TargetTemperature !== undefined) {
-        this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.TargetTemperature);
+      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
+          heatingThresholdTemperature !== undefined) {
+        this.service.updateCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature, heatingThresholdTemperature);
       }
-      if (
-        this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
-        this.CoolingThresholdTemperature !== undefined
-      ) {
-        this.service.updateCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature, this.CoolingThresholdTemperature);
-      }
-      if (
-        this.TargetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
-        this.HeatingThresholdTemperature !== undefined
-      ) {
-        this.service.updateCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature, this.HeatingThresholdTemperature);
-      }
-      if(this.TemperatureDisplayUnits !== undefined){
-        this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.TemperatureDisplayUnits);
-      }
-      if(this.CurrentRelativeHumidity !== undefined){
-        this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.CurrentRelativeHumidity);
-      }
-      if(this.TargetRelativeHumidity !== undefined){
-        this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.TargetRelativeHumidity);
-      }
-      this.platform.log.debug('Thermostat', this.accessory.displayName, '- Updated thermostat characteristics...');
-    } else{
-      this.platform.log.info('Thermostat', this.accessory.displayName, '- Waiting for data...');
+
+      this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, 
+        this.handleTemperatureDisplayUnitsGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
+        this.handleCurrentHumidityGet());
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, 
+        this.handleTargetHumidityGet());
     }
   }
 
@@ -195,7 +173,7 @@ export class DaikinOnePlusThermostat {
         currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
         break;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get CurrentHeatingCoolingState:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get CurrentHeatingCoolingState:', currentValue);
     return currentValue;
   }
   
@@ -222,11 +200,11 @@ export class DaikinOnePlusThermostat {
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
         break;
       default:
-        this.platform.log.debug('Thermostat', this.accessory.displayName, 
+        this.platform.log.debug(this.accessory.displayName, 
           '- Unable to get TargetHeatingCoolingState. Unknown state retrieved:', currentStatus);
         break;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get TargetHeatingCoolingState:', currentValue);
+    this.platform.log.debug(this.accessory.displayName, '- Get TargetHeatingCoolingState:', currentValue);
     return currentValue;
   }
   
@@ -241,7 +219,7 @@ export class DaikinOnePlusThermostat {
     } else if (currentTemp > 100) {
       currentTemp = 100;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get CurrentTemperature:', currentTemp);
+    this.platform.log.debug(this.accessory.displayName, '- Get CurrentTemperature:', currentTemp);
     return currentTemp;
   }
   
@@ -256,7 +234,7 @@ export class DaikinOnePlusThermostat {
     } else if (targetTemp > 100) {
       targetTemp = 100;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get TargetTemperature:', targetTemp);
+    this.platform.log.debug(this.accessory.displayName, '- Get TargetTemperature:', targetTemp);
     return targetTemp;
   }
 
@@ -268,7 +246,7 @@ export class DaikinOnePlusThermostat {
     } else if (temp > 25) {
       temp = 25;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get HeatingThresholdTemperature:', temp);
+    this.platform.log.debug(this.accessory.displayName, '- Get HeatingThresholdTemperature:', temp);
     return temp;
   }
 
@@ -280,7 +258,7 @@ export class DaikinOnePlusThermostat {
     } else if (temp > 35) {
       temp = 35;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get CoolingThresholdTemperature:', temp);
+    this.platform.log.debug(this.accessory.displayName, '- Get CoolingThresholdTemperature:', temp);
     return temp;
   }
   
@@ -296,7 +274,7 @@ export class DaikinOnePlusThermostat {
     } else {
       targetUnits = this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get TemperatureDisplayUnits:', targetUnits);
+    this.platform.log.debug(this.accessory.displayName, '- Get TemperatureDisplayUnits:', targetUnits);
     return targetUnits;
   }
   
@@ -311,7 +289,7 @@ export class DaikinOnePlusThermostat {
     } else if (currentHumidity > 100) {
       currentHumidity = 100;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get CurrentRelativeHumidity:', currentHumidity);
+    this.platform.log.debug(this.accessory.displayName, '- Get CurrentRelativeHumidity:', currentHumidity);
     return currentHumidity;
   }
   
@@ -326,7 +304,7 @@ export class DaikinOnePlusThermostat {
     } else if (targetHumidity > 100) {
       targetHumidity = 100;
     }
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Get TargetHumidity:', targetHumidity);
+    this.platform.log.debug(this.accessory.displayName, '- Get TargetHumidity:', targetHumidity);
     return targetHumidity;
   }
   
@@ -334,8 +312,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Target Heating Cooling State" characteristic
    */
   async handleTargetHeatingCoolingStateSet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TargetHeatingCoolingState:', value);
-    this.TargetHeatingCoolingState = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set TargetHeatingCoolingState:', value);
   
     // set this to a valid value for TargetHeatingCoolingState
     let requestedState = TargetHeatingCoolingState.OFF;
@@ -362,8 +339,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Target Temperature" characteristic
    */
   async handleTargetTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TargetTemperature:', value);
-    this.TargetTemperature = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set TargetTemperature:', value);
     await this.daikinApi.setTargetTemps(this.deviceId, Number(value));
   }
 
@@ -371,8 +347,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Cooling Threshold Temperature" characteristic
    */
   async handleCoolingThresholdTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set CoolingThresholdTemperature:', value);
-    this.CoolingThresholdTemperature = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set CoolingThresholdTemperature:', value);
     await this.daikinApi.setTargetTemps(this.deviceId, undefined, undefined, Number(value));
   }
 
@@ -380,8 +355,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Heating Threshold Temperature" characteristic
    */
   async handleHeatingThresholdTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set HeatingThresholdTemperature:', value);
-    this.HeatingThresholdTemperature = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set HeatingThresholdTemperature:', value);
     await this.daikinApi.setTargetTemps(this.deviceId, undefined, Number(value), undefined);
   }
   
@@ -389,8 +363,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Temperature Display Units" characteristic
    */
   async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TemperatureDisplayUnits:', value);
-    this.TemperatureDisplayUnits = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set TemperatureDisplayUnits:', value);
     let requestedUnits = 0; //FAHRENHEIT
     switch(value){
       case this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT:
@@ -409,8 +382,7 @@ export class DaikinOnePlusThermostat {
    * Handle requests to set the "Target Humidity" characteristic
    */
   async handleTargetHumiditySet(value: CharacteristicValue) {
-    this.platform.log.debug('Thermostat', this.accessory.displayName, '- Set TargetHumidity:', value);
-    this.TargetRelativeHumidity = value;
+    this.platform.log.debug(this.accessory.displayName, '- Set TargetHumidity:', value);
     await this.daikinApi.setTargetHumidity(this.deviceId, Number(value));
   }
 }

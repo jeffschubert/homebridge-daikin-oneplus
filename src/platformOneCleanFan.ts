@@ -49,20 +49,22 @@ export class DaikinOnePlusOneCleanFan {
   }
 
   /**
-   * Handle requests to get the current value of the "On" characteristic
+   * Handle requests to get the current value of the "Active" characteristic
    */
   handleActiveGet() {
-    return this.daikinApi.deviceHasData(this.deviceId) &&
+    const currentState =( this.daikinApi.deviceHasData(this.deviceId) &&
       this.daikinApi.getOneCleanFanActive(this.deviceId)
       ? this.platform.Characteristic.Active.ACTIVE
-      : this.platform.Characteristic.Active.INACTIVE;
+      : this.platform.Characteristic.Active.INACTIVE);
+    this.platform.log.debug(this.accessory.displayName, '- Get OneClean Fan State:', currentState);
+    return currentState;
   }
 
   /**
-   * Handle requests to set the "On" characteristic
+   * Handle requests to set the "Active" characteristic
    */
   async handleActiveSet(value: CharacteristicValue) {
-    this.platform.log.debug('One Clean Fan', this.accessory.displayName, '- Set One Clean Fan State:', value);
+    this.platform.log.debug(this.accessory.displayName, '- Set OneClean Fan State:', value);
     await this.daikinApi.setOneCleanFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
   }
 }

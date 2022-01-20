@@ -183,7 +183,7 @@ export class DaikinApi{
         this._updateIn(blockUntilMs > nextUpdateInMs ? blockUntilMs : nextUpdateInMs);
       } else {
         // if the next update is already far enough in the future, nothing else to do
-        this.log(LoggerLevel.DEBUG, `not rescheduling next update because ${blockUntilMs} is after ${scheduledRunInMs}`);
+        this.log(LoggerLevel.DEBUG, `Not rescheduling next update because ${scheduledRunInMs} is after ${blockUntilMs}`);
       }
     }
 
@@ -397,7 +397,7 @@ export class DaikinApi{
     async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean>{
       const deviceData = this._cachedDeviceById(deviceId)?.data;
       if(!deviceData){
-        this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set target temp.');
+        this.log(LoggerLevel.INFO, `Device data could not be retrieved. Unable to set target temp. (${deviceId})`);
         return false;
       }
 
@@ -421,119 +421,36 @@ export class DaikinApi{
           };
           break;
         default:
-          this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp.`);
+          this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp. (${deviceId})`);
           return false;
       }
 
       if(deviceData.schedEnabled){
         requestedData.schedOverride = 1;
       }
-
-      this.log(LoggerLevel.DEBUG, 'setTargetTemps-> requestedData: ', requestedData);
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
-        requestedData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this._token.accessToken}`,
-          },
-        })
-        .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setTargetTemp-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
-          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-          return true;
-        })
-        .catch((error) => this.logError('Error updating target temp:', error));
+      return this.putRequest(deviceId, requestedData, 'setTargetTemps', 'Error updating target temp:');
     }
 
     async setTargetState(deviceId: string, requestedState: number): Promise<boolean>{
-      this.log(LoggerLevel.DEBUG, `setTargetState-> device:${deviceId}; state:${requestedState}`);
-      const requestedData = {mode: requestedState};
-
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
-        requestedData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this._token.accessToken}`,
-          },
-        })
-        .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setTargetState-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
-          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-          return true; 
-        })
-        .catch((error) => this.logError('Error updating target state:', error));
+      return this.putRequest(deviceId, {mode: requestedState}, 'setTargetState', 'Error updating target state:');
     }
 
     async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
-      this.log(LoggerLevel.DEBUG, `setOneCleanFanActive-> device:${deviceId}; state:${requestedState}`);
-      const requestedData = {oneCleanFanActive: requestedState};
-
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`,
-        requestedData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this._token.accessToken}`,
-          },
-        })
-        .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setOneCleanFanActive-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
-          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-          return true;
-        })
-        .catch((error) => this.logError('Error updating one clean fan:', error));
+      return this.putRequest(deviceId, {oneCleanFanActive: requestedState}, 'setOneCleanFanActive', 'Error updating OneClean fan:');
     }
 
     async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{
-      this.log(LoggerLevel.DEBUG, `setDisplayUnits-> device:${deviceId}; units:${requestedUnits}`);
-      const requestedData = {units: requestedUnits};
-
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
-        requestedData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this._token.accessToken}`,
-          },
-        })
-        .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setDisplayUnits-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
-          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-          return true;
-        })
-        .catch((error) => this.logError('Error updating target state:', error));
+      return this.putRequest(deviceId, {units: requestedUnits}, 'setDisplayUnits', 'Error updating display units:');
     }
 
     async setTargetHumidity(deviceId: string, requestedHumidity: number) : Promise<boolean>{
-      this.log(LoggerLevel.DEBUG, `setTargetHumidity-> device:${deviceId}; humidity:${requestedHumidity}`);
-      const requestedData = {humSP: requestedHumidity};
-      return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
-        requestedData, {
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this._token.accessToken}`,
-          },
-        })
-        .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setTargetHumidity-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
-          this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-          return true;
-        })
-        .catch((error) => this.logError('Error updating target humidity:', error));
+      return this.putRequest(deviceId, {humSP: requestedHumidity}, 'setTargetHumidity', 'Error updating target humidity:');
     }
 
     async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
       const deviceData = this._cachedDeviceById(deviceId)?.data;
       if(!deviceData){
-        this.log(LoggerLevel.INFO, 'Device data could not be retrieved. Unable to set away state.');
+        this.log(LoggerLevel.INFO, `Device data could not be retrieved. Unable to set away state. (${deviceId})`);
         return false;
       }
 
@@ -550,14 +467,18 @@ export class DaikinApi{
             };
           } else{
             // nothing to do. geofencing is disabled so away state can't be set.
-            this.log(LoggerLevel.INFO, 'Device has geofencing disabled. Unable to set away state to off.');
+            this.log(LoggerLevel.INFO, `Device has geofencing disabled. Unable to set away state to off. (${deviceId})`);
             return true;
           }
           break;
       }
-      this.log(LoggerLevel.DEBUG, 'setAwayState-> requestedData: ', requestedData);
+      return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
+    }
+
+    private putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean>{
+      this.log(LoggerLevel.DEBUG, `${caller}-> device: ${deviceId}; requestData: ${JSON.stringify(requestData)}`);
       return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
-        requestedData, {
+        requestData, {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
@@ -565,12 +486,12 @@ export class DaikinApi{
           },
         })
         .then(res => {
-          this.log(LoggerLevel.DEBUG, 'setAwayState-> response: ', res.data);
-          this._updateCache(deviceId, requestedData);
+          this.log(LoggerLevel.DEBUG, `${caller}-> device: ${deviceId}; response:${JSON.stringify(res.data)}`);
+          this._updateCache(deviceId, requestData);
           this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
-        .catch((error) => this.logError('Error updating away state:', error));
+        .catch((error) => this.logError(errorHeader, error));
     }
 
     private _updateCache(deviceId: string, partialUpdate: any) {
@@ -581,9 +502,9 @@ export class DaikinApi{
           ...partialUpdate,
         };
         cachedDevice.data = updatedData;
-        this.log(LoggerLevel.DEBUG, `Updated cache for ${deviceId} - ${cachedDevice.data.hspHome}`);
+        this.log(LoggerLevel.DEBUG, `Updated cache for ${deviceId} - ${JSON.stringify(partialUpdate)}`);
       } else {
-        this.log(LoggerLevel.ERROR, `Cache update for device that doesn't exist ${deviceId}`);
+        this.log(LoggerLevel.ERROR, `Cache update for device that doesn't exist: ${deviceId}`);
       }
     }
 

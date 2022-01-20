@@ -32,6 +32,13 @@ export class DaikinOnePlusHumidity {
 
     // set the service name, this is what is displayed as the default name on the Home app
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
+
+    this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity)
+      .onGet(()=>{
+        this.daikinApi.updateNow();
+        return this.handleHumidityGet();
+      });
+    
     this.updateValues();
     this.daikinApi.addListener(this.updateValues.bind(this));
   }
@@ -40,10 +47,6 @@ export class DaikinOnePlusHumidity {
     if(this.daikinApi.deviceHasData(this.deviceId)){
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, 
         this.handleHumidityGet());
-  
-      this.platform.log.debug('Humidity', this.accessory.displayName, '- Updated humidity characteristics...');
-    } else{
-      this.platform.log.info('Humidity', this.accessory.displayName, '- Waiting for data...');
     }
   }
 
@@ -60,7 +63,7 @@ export class DaikinOnePlusHumidity {
     } else if (currentHumidity > 100) {
       currentHumidity = 100;
     }
-    this.platform.log.debug('Humidity', this.accessory.displayName, '- Get Humidity:', currentHumidity);
+    this.platform.log.debug(this.accessory.displayName, '- Get Humidity:', currentHumidity);
     return currentHumidity;
   }
 }

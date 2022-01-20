@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Daikin One+",
   "name": "homebridge-daikin-oneplus",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Control a Daikin One+ thermostat.",
   "license": "Apache-2.0",
   "repository": {
