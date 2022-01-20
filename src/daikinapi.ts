@@ -214,23 +214,7 @@ export class DaikinApi{
           'Content-Type': 'application/json',
         },
       }).then((response)=>this.setToken(response))
-        .catch((error) => {
-          if (error.response) {
-            // When response status code is out of 2xx range 
-            this.log(LoggerLevel.ERROR, 'Error with token response:');
-            this.log(LoggerLevel.ERROR, error.response.data);
-            this.log(LoggerLevel.ERROR, error.response.status);
-            this.log(LoggerLevel.ERROR, error.response.headers);
-          } else if (error.request) {
-            // When no response was received after request was made
-            this.log(LoggerLevel.ERROR, 'Error with token request:');
-            this.log(LoggerLevel.ERROR, error.request);
-          } else {
-            // Error
-            this.log(LoggerLevel.ERROR, 'General error getting token:');
-            this.log(LoggerLevel.ERROR, error.message);
-          }
-        });
+        .catch((error) => this.logError('Error getting token:', error));
     }
 
     async setToken(response: AxiosResponse<any>){
@@ -245,7 +229,7 @@ export class DaikinApi{
 
     getDevices(){
       return this.getRequest('https://api.daikinskyport.com/devices')
-        .then((response)=>this._devices = response);
+        .then((response) => this._devices = response);
     }
 
     getDeviceData(device){
@@ -268,7 +252,7 @@ export class DaikinApi{
           'Content-Type': 'application/json',
         },
       }).then((response)=>this.setToken(response))
-        .catch((error) => this.logError('Error retrieving token:', error));
+        .catch((error) => this.logError('Error refreshing token:', error));
     }
 
     getRequest(uri: string){
@@ -282,7 +266,7 @@ export class DaikinApi{
       return axios.get(uri, {
         headers:{
           'Accept': 'application/json',
-          'Authorization': 'Bearer ' + this._token.accessToken,
+          'Authorization': `Bearer ${this._token.accessToken}`,
         },
       }).then((response)=>response.data) 
         .catch((error) => {
@@ -460,7 +444,7 @@ export class DaikinApi{
           this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
-        .catch((error) => this.logError('Error updating target temp: ', error));
+        .catch((error) => this.logError('Error updating target temp:', error));
     }
 
     async setTargetState(deviceId: string, requestedState: number): Promise<boolean>{
@@ -586,7 +570,7 @@ export class DaikinApi{
           this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
           return true;
         })
-        .catch((error) => this.logError('Error updating away state: ', error));
+        .catch((error) => this.logError('Error updating away state:', error));
     }
 
     private _updateCache(deviceId: string, partialUpdate: any) {
