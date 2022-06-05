@@ -30,6 +30,19 @@ In addition to basic retrieving and setting of the thermostat's current temperat
 
 \* If supported by your Daikin system.
 
+## Known Issue
+  * Per [issue #20](https://github.com/jeffschubert/homebridge-daikin-oneplus/issues/20), it may now be necessary to request an integration token via the Daikin One Home app before this plugin can successfully communicate with the Daikin API.
+    * To get an integration token:
+      * Open the Daikin One Home app
+      * Go to **account settings** on the Location/root/top screen of the app.
+      * Select **home integration**
+      * Select **get integration token**
+      * Agree to terms
+      * Enter your account password
+      * Select **send request**
+    * Once you receive the token, nothing further should be required.
+    * You may need to uninstall/reinstall the plugin, or at least restart Homebridge to get a successful connection.
+
 ## Installation
 If you are new to Homebridge, please first read the [Homebridge](https://homebridge.io) [documentation](https://github.com/homebridge/homebridge/wiki) and installation instructions before proceeding.
 
