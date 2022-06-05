@@ -76,6 +76,12 @@
         "description": "Enable fan that allows the user to run one clean.",
         "type": "boolean",
         "default": false
+      },
+      "enableCirculateAirFan": {
+        "title": "Enable Circulate Air Fan",
+        "description": "Enable fan that allows the user to run the fan constantly at the specified speed.",
+        "type": "boolean",
+        "default": false
       }
     }
   },
@@ -116,7 +122,8 @@
         "ignoreOutdoorHumSensor",
         "enableAwaySwitch",
         "enableEmergencyHeatSwitch",
-        "enableOneCleanFan"
+        "enableOneCleanFan",
+        "enableCirculateAirFan"
       ]
     }]
 }

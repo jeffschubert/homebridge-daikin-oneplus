@@ -11,12 +11,19 @@ In addition to basic retrieving and setting of the thermostat's current temperat
   * Away switch to get/set away state of thermostat
   * Emergency Heat switch to get/set emergency/auxiliary heat state of thermostat (v2)
   * One Clean fan to trigger the thermostat to run the fan for a 3 hour One Clean cycle (v2)
+  * Circulate Air fan (v2.1)
+    * Allows the Circulate Air feature to be toggled between 'off' and 'always on'
+    * Fan speed can be adjusted:
+      * 0% : Off
+      * 33% : Low
+      * 66% : Medium
+      * 100% : High
   * Advanced thermostat functionality
     * Switch between cool, heat, and auto
     * In Auto, set both cooling and heating threshold
     * Temporarily override a schedule.
       * Schedule will be paused for a period of time based on how the thermostat is configured. The thermostat can be configured to pause for 1, 4, or 8 hours, or until the next event in the schedule.
-  * Additionally, version 2 will improve performance in several ways:
+  * Additionally, version 2 improves performance in several ways:
     * Reduce bandwidth by checking the Daikin API every 3 minutes or on demand when interacting with HomeKit (instead of the previous every 10s)
     * After updates, wait up to 15 seconds before checking API to avoid HomeKit showing stale data.
 
@@ -54,6 +61,7 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "enableAwaySwitch": false,          // If true, enable switch accessory to get/set the Away state of thermostats found in Daikin account.
     "enableEmergencyHeatSwitch": false, // If true, enable switch accessory to request auxiliary/emergency heat only.
     "enableOneCleanFan": false,         // If true, enable fan accessory that allows the user to run one clean.
+    "enableCirculateAirFan": false,     // If true, enable fan accessory that allows the user to run the fan constantly at the specified speed.
   }
 ]
 ```

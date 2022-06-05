@@ -321,6 +321,16 @@ export class DaikinApi{
       return device.data.oneCleanFanActive;
     }
 
+    getCirculateAirFanActive(deviceId: string): boolean {
+      const device = this._cachedDeviceById(deviceId);
+      return device.data.fanCirculate === 0 ? false : true;
+    }
+
+    getCirculateAirFanSpeed(deviceId: string): number {
+      const device = this._cachedDeviceById(deviceId);
+      return device.data.fanCirculateSpeed;
+    }
+
     getTargetTemp(deviceId: string): number {
       const device = this._cachedDeviceById(deviceId);
       switch(device.data.mode){
@@ -437,6 +447,21 @@ export class DaikinApi{
 
     async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
       return this.putRequest(deviceId, {oneCleanFanActive: requestedState}, 'setOneCleanFanActive', 'Error updating OneClean fan:');
+    }
+
+    async setCirculateAirFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
+      return this.putRequest(deviceId, {fanCirculate: requestedState ? 1 : 0}, 
+        'setCirculateAirFanActive', 'Error updating Circulate Air fan:');
+    }
+
+    async setCirculateAirFanSpeed(deviceId: string, requestedSpeed: number): Promise<boolean>{
+      if(requestedSpeed === -1){
+        return this.putRequest(deviceId, {fanCirculate: 0, fanCirculateSpeed: 1}, 
+          'setCirculateAirFanSpeed', 'Error updating Circulate Air fan and speed:');
+      } else {
+        return this.putRequest(deviceId, {fanCirculateSpeed: requestedSpeed}, 
+          'setCirculateAirFanSpeed', 'Error updating Circulate Air fan speed:');
+      }
     }
 
     async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{
