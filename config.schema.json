@@ -16,12 +16,18 @@
       "user": {
         "title": "Daikin Username",
         "type": "string",
-        "required": true
+        "required": true,
+        "x-schema-form": {
+          "type": "username"
+        }
       },
       "password": {
         "title": "Daikin Password",
         "type": "string",
-        "required": true
+        "required": true,
+        "x-schema-form": {
+          "type": "password"
+        }
       },
       "includeDeviceName": {
         "title": "Include Device Name",
