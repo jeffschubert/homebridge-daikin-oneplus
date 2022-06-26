@@ -1,6 +1,7 @@
 # Daikin One+ Thermostat Homebridge Plugin
 [![Downloads](https://img.shields.io/npm/dt/homebridge-daikin-oneplus?logo=icloud&style=for-the-badge)](https://www.npmjs.com/package/homebridge-daikin-oneplus)
 [![Version](https://img.shields.io/npm/v/homebridge-daikin-oneplus?label=Latest%20Version&style=for-the-badge)](https://www.npmjs.com/package/homebridge-daikin-oneplus)
+[![Daikin One+@Homebridge Discord](https://img.shields.io/discord/432663330281226270?label=Discord&logo=discord&style=for-the-badge)](https://discord.gg/6whreuQEph)
 [![verified-by-homebridge](https://img.shields.io/badge/homebridge-verified-blueviolet?color=%23491F59&style=for-the-badge&logoColor=%23FFFFFF&logo=homebridge)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 
 ## HomeKit support for Daikin One+ thermostats using [Homebridge](https://homebridge.io)
