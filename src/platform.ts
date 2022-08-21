@@ -14,6 +14,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DaikinOnePlusThermostat } from './platformThermostat';
 import { DaikinOnePlusAQSensor } from './platformAQI';
 import { DaikinOnePlusHumidity } from './platformHumidity';
+import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch';
 import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch';
 import { DaikinApi, LoggerLevel, LogMessage } from './daikinapi';
 import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch';
@@ -138,6 +139,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.discoverIndoorHumSensor(device);
       this.discoverOutdoorAqi(device, deviceData);
       this.discoverIndoorAqi(device, deviceData);
+      this.discoverScheduleSwitch(device);
       this.discoverAwaySwitch(device);
       this.discoverEmergencyHeatSwitch(device);
       this.discoverOneCleanFan(device);
@@ -231,6 +233,36 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     } else if (existingAccessory) {
       //Delete any existing one clean fan
       this.log.info('Removing circulate air fan from cache:', existingAccessory.displayName);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private discoverScheduleSwitch(device: any) {
+    const uuid = this.api.hap.uuid.generate(`${device.id}_schedule`);
+    this.log.info('Checking for Schedule Switch...');
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config.enableScheduleSwitch) {
+      const dName = this.config.includeDeviceName ? `${device.name} Schedule State` : 'Schedule State';
+      if (existingAccessory) {
+        // the accessory already exists
+        existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
+        this.log.info('Restoring existing schedule switch from cache:', existingAccessory.displayName);
+        new DaikinOnePlusScheduleSwitch(this, existingAccessory, device.id, this.daikinApi);
+      } else {
+        // the accessory does not yet exist, so we need to create it
+        this.log.info('Adding new schedule switch:', dName);
+
+        const accessory = new this.api.platformAccessory(dName, uuid);
+        accessory.context.device = device;
+        new DaikinOnePlusScheduleSwitch(this, accessory, device.id, this.daikinApi);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+    } else if (existingAccessory) {
+      //Delete any existing Schedule switch
+      this.log.info('Removing Schedule switch from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }

@@ -399,6 +399,11 @@ export class DaikinApi{
     return device.data.units;
   }
 
+  getScheduleState(deviceId: string): boolean {
+    const device = this._cachedDeviceById(deviceId);
+    return device.data.schedOverride == 0 && device.data.schedEnabled && !device.data.geofencingAway && this._hasScheduleFor(deviceId);
+  }
+
   getAwayState(deviceId: string): boolean {
     const device = this._cachedDeviceById(deviceId);
     return device.data.geofencingAway;
@@ -472,29 +477,44 @@ export class DaikinApi{
     return this.putRequest(deviceId, {humSP: requestedHumidity}, 'setTargetHumidity', 'Error updating target humidity:');
   }
 
+  async setScheduleState(deviceId: string, requestedState: boolean): Promise<boolean>{
+    let requestedData = {};
+    //  when enabling the schedule state, a schedule must exist.
+    if(this._hasScheduleFor(deviceId) && requestedState){
+      requestedData = {
+        geofencingAway: false,
+        schedOverride: 0,
+        schedEnabled: true,
+      };
+    } else {
+      requestedData = {
+        schedEnabled: false,
+      };    
+    }
+    this.log(LoggerLevel.DEBUG, `Schedule for ${deviceId}: ${requestedState}: ${requestedData}`);
+    return this.putRequest(deviceId, requestedData, 'setScheduleState', 'Error updating schedule state:');
+  }
+
   async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
     let requestedData = {};
-    switch(requestedState){
-      case true:
-        //  when enabling the away state, the schedule (if it exists) is automatically paused.
+    if(requestedState){
+      //  when enabling the away state, the schedule (if it exists) is automatically paused.
+      requestedData = {
+        geofencingAway: true,
+      };
+    } else {
+      //  when disabling the away state, we must re-enable the schedule if one exists.
+      if(this._hasScheduleFor(deviceId)){
         requestedData = {
-          geofencingAway: true,
+          geofencingAway: false,
+          schedEnabled: true,
         };
-        break;
-      case false:
-        //  when disabling the away state, we must re-enable the schedule if one exists.
-        if(this._hasScheduleFor(deviceId)){
-          requestedData = {
-            geofencingAway: false,
-            schedEnabled: true,
-          };
-  
-        } else {
-          requestedData = {
-            geofencingAway: false,
-          };
-        }
-        break;
+
+      } else {
+        requestedData = {
+          geofencingAway: false,
+        };
+      }
     }
     return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
   }
