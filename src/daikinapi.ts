@@ -401,7 +401,7 @@ export class DaikinApi{
 
   getAwayState(deviceId: string): boolean {
     const device = this._cachedDeviceById(deviceId);
-    return device.data.geofencingAway && device.data.geofencingEnabled;
+    return device.data.geofencingAway;
   }
 
   async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean>{
@@ -473,27 +473,26 @@ export class DaikinApi{
   }
 
   async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
-    const deviceData = this._cachedDeviceById(deviceId)?.data;
-    if(!deviceData){
-      this.log(LoggerLevel.INFO, `Device data could not be retrieved. Unable to set away state. (${deviceId})`);
-      return false;
-    }
-
     let requestedData = {};
-    switch(deviceData.geofencingEnabled){
-      case true: //thermostat has geofencing enabled, thus we can just toggle away state
-        requestedData = {geofencingAway: requestedState};
+    switch(requestedState){
+      case true:
+        //  when enabling the away state, the schedule (if it exists) is automatically paused.
+        requestedData = {
+          geofencingAway: true,
+        };
         break;
-      case false: //thermostat has geofencing disabled, thus we need to set it and also toggle away state
-        if(requestedState){
+      case false:
+        //  when disabling the away state, we must re-enable the schedule if one exists.
+        if(this._hasScheduleFor(deviceId)){
           requestedData = {
-            geofencingEnabled: true, 
-            geofencingAway: true,
+            geofencingAway: false,
+            schedEnabled: true,
           };
-        } else{
-          // nothing to do. geofencing is disabled so away state can't be set.
-          this.log(LoggerLevel.INFO, `Device has geofencing disabled. Unable to set away state to off. (${deviceId})`);
-          return true;
+  
+        } else {
+          requestedData = {
+            geofencingAway: false,
+          };
         }
         break;
     }
@@ -538,6 +537,28 @@ export class DaikinApi{
       return undefined;
     }
     return this._devices.find(e => e.id === deviceId);
+  }
+
+  private _hasScheduleFor(deviceId: string) {
+    const cachedDevice = this._cachedDeviceById(deviceId);
+    if (cachedDevice) {
+      const data = cachedDevice.data;
+      let hasSchedule = false;
+      if ( (data.schedMonPart1Enabled ?? false)
+          || (data.schedTuePart1Enabled ?? false)
+          || (data.schedWedPart1Enabled ?? false)
+          || (data.schedThuPart1Enabled ?? false)
+          || (data.schedFriPart1Enabled ?? false)
+          || (data.schedSatPart1Enabled ?? false)
+          || (data.schedSunPart1Enabled ?? false) ) {
+        hasSchedule = true;
+      }
+      this.log(LoggerLevel.DEBUG, `Schedule for ${deviceId}: ${hasSchedule}`);
+      return hasSchedule;
+    } else {
+      this.log(LoggerLevel.ERROR, `No schedule for device that doesn't exist: ${deviceId}`);
+      return false;
+    }
   }
 
   logError(message: string, error): boolean{
