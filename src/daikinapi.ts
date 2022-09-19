@@ -401,7 +401,7 @@ export class DaikinApi{
 
   getScheduleState(deviceId: string): boolean {
     const device = this._cachedDeviceById(deviceId);
-    return device.data.schedOverride == 0 && device.data.schedEnabled && !device.data.geofencingAway && this._hasScheduleFor(deviceId);
+    return device.data.schedOverride === 0 && device.data.schedEnabled && !device.data.geofencingAway && this._hasScheduleFor(deviceId);
   }
 
   getAwayState(deviceId: string): boolean {
