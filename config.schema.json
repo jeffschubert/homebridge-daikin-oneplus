@@ -65,6 +65,12 @@
         "type": "boolean",
         "default": false
       },
+      "enableScheduleSwitch": {
+        "title": "Enable Schedule Switch",
+        "description": "Enable switch to get/set the Schedule state of thermostats found in Daikin account.",
+        "type": "boolean",
+        "default": false
+      },
       "enableAwaySwitch": {
         "title": "Enable Away Switch",
         "description": "Enable switch to get/set the Away state of thermostats found in Daikin account.",
@@ -126,6 +132,7 @@
         "ignoreOutdoorAqi",
         "ignoreIndoorHumSensor",
         "ignoreOutdoorHumSensor",
+        "enableScheduleSwitch",
         "enableAwaySwitch",
         "enableEmergencyHeatSwitch",
         "enableOneCleanFan",

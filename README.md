@@ -21,6 +21,8 @@
     * Relative humidity sensors
       * Display indoor and outdoor levels
       * Set target indoor relative humidity
+  * Schedule switch
+    * Display and set thermostat's schedule state
   * Away switch
     * Display and set thermostat's away state
   * Emergency Heat switch
