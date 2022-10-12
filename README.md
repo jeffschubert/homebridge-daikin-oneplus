@@ -83,6 +83,7 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "enableEmergencyHeatSwitch": false, // If true, enable switch accessory to request auxiliary/emergency heat only.
     "enableOneCleanFan": false,         // If true, enable fan accessory that allows the user to run one clean.
     "enableCirculateAirFan": false,     // If true, enable fan accessory that allows the user to run the fan constantly at the specified speed.
+    "enableScheduleSwitch": false,      // If true, enable switch accessory to get/set the Schedule state of thermostats found in Daikin account.
   }
 ]
 ```
