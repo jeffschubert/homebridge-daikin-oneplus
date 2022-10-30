@@ -61,7 +61,7 @@ export class DaikinOnePlusAwaySwitch {
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug(this.accessory.displayName, '- Set Away State:', value);
-    await this.daikinApi.setAwayState(this.deviceId, Boolean(value));
+    await this.daikinApi.setAwayState(this.deviceId, Boolean(value), this.platform.config.autoResumeSchedule);
   }
   
 }

@@ -401,7 +401,7 @@ export class DaikinApi{
 
   getScheduleState(deviceId: string): boolean {
     const device = this._cachedDeviceById(deviceId);
-    return device.data.schedOverride === 0 && device.data.schedEnabled && !device.data.geofencingAway && this._hasScheduleFor(deviceId);
+    return device.data.schedOverride === 0 && device.data.schedEnabled && !device.data.geofencingAway;
   }
 
   getAwayState(deviceId: string): boolean {
@@ -480,7 +480,7 @@ export class DaikinApi{
   async setScheduleState(deviceId: string, requestedState: boolean): Promise<boolean>{
     let requestedData = {};
     //  when enabling the schedule state, a schedule must exist.
-    if(this._hasScheduleFor(deviceId) && requestedState){
+    if(requestedState){
       requestedData = {
         geofencingAway: false,
         schedOverride: 0,
@@ -495,7 +495,7 @@ export class DaikinApi{
     return this.putRequest(deviceId, requestedData, 'setScheduleState', 'Error updating schedule state:');
   }
 
-  async setAwayState(deviceId: string, requestedState: boolean): Promise<boolean>{
+  async setAwayState(deviceId: string, requestedState: boolean, enableSchedule: boolean): Promise<boolean>{
     let requestedData = {};
     if(requestedState){
       //  when enabling the away state, the schedule (if it exists) is automatically paused.
@@ -503,8 +503,7 @@ export class DaikinApi{
         geofencingAway: true,
       };
     } else {
-      //  when disabling the away state, we must re-enable the schedule if one exists.
-      if(this._hasScheduleFor(deviceId)){
+      if(enableSchedule){
         requestedData = {
           geofencingAway: false,
           schedEnabled: true,
@@ -557,28 +556,6 @@ export class DaikinApi{
       return undefined;
     }
     return this._devices.find(e => e.id === deviceId);
-  }
-
-  private _hasScheduleFor(deviceId: string) {
-    const cachedDevice = this._cachedDeviceById(deviceId);
-    if (cachedDevice) {
-      const data = cachedDevice.data;
-      let hasSchedule = false;
-      if ( (data.schedMonPart1Enabled ?? false)
-          || (data.schedTuePart1Enabled ?? false)
-          || (data.schedWedPart1Enabled ?? false)
-          || (data.schedThuPart1Enabled ?? false)
-          || (data.schedFriPart1Enabled ?? false)
-          || (data.schedSatPart1Enabled ?? false)
-          || (data.schedSunPart1Enabled ?? false) ) {
-        hasSchedule = true;
-      }
-      this.log(LoggerLevel.DEBUG, `Schedule for ${deviceId}: ${hasSchedule}`);
-      return hasSchedule;
-    } else {
-      this.log(LoggerLevel.ERROR, `No schedule for device that doesn't exist: ${deviceId}`);
-      return false;
-    }
   }
 
   logError(message: string, error): boolean{

@@ -94,6 +94,12 @@
         "description": "Enable fan that allows the user to run the fan constantly at the specified speed.",
         "type": "boolean",
         "default": false
+      },
+      "autoResumeSchedule": {
+        "title": "Enable Schedule after Away",
+        "description": "When the Away switch is toggled off, automatically enable the schedule.",
+        "type": "boolean",
+        "default": false
       }
     }
   },
@@ -124,16 +130,26 @@
       "ref": "ignore",
       "type": "fieldset",
       "expandable": true,
-      "title": "Accessory Setup",
-      "description": "Prevent specific accessories from being loaded on start up.",
+      "title": "Sensor Setup",
+      "description": "Specify whether specific sensors should not be loaded on start up.",
       "items": [
         "ignoreThermostat",
         "ignoreIndoorAqi",
         "ignoreOutdoorAqi",
         "ignoreIndoorHumSensor",
-        "ignoreOutdoorHumSensor",
+        "ignoreOutdoorHumSensor"
+      ]
+    },
+    {
+      "ref": "ignore",
+      "type": "fieldset",
+      "expandable": true,
+      "title": "Optional Accessories",
+      "description": "Extra accessories to control specific aspects of the thermostat.",
+      "items": [
         "enableScheduleSwitch",
         "enableAwaySwitch",
+        "autoResumeSchedule",
         "enableEmergencyHeatSwitch",
         "enableOneCleanFan",
         "enableCirculateAirFan"
