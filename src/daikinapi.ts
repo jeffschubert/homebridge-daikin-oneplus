@@ -417,19 +417,33 @@ export class DaikinApi{
     }
 
     let requestedData;
+    // Only send the request if the request provides a value pertinent to the current state/mode.
     switch (deviceData.mode) {
       case TargetHeatingCoolingState.HEAT:
       case TargetHeatingCoolingState.AUXILIARY_HEAT:
+        if(!targetTemp) {
+          return true;
+        }
+
         requestedData = {
-          hspHome: targetTemp || heatThreshold,
+          hspHome: targetTemp,
         };
         break;
       case TargetHeatingCoolingState.COOL:
+        if(!targetTemp){
+          return true;
+        }
+
         requestedData = {
-          cspHome: targetTemp || coolThreshold,
+          cspHome: targetTemp,
         };
         break;
       case TargetHeatingCoolingState.AUTO:
+      case TargetHeatingCoolingState.OFF:
+        if(!heatThreshold || !coolThreshold){
+          return true;
+        }
+
         requestedData = {
           hspHome: heatThreshold,
           cspHome: coolThreshold,
@@ -439,7 +453,7 @@ export class DaikinApi{
         this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp. (${deviceId})`);
         return false;
     }
-
+    
     if(deviceData.schedEnabled){
       requestedData.schedOverride = 1;
     }
