@@ -67,7 +67,7 @@ export class DaikinOnePlusCirculateAirFan {
       this.daikinApi.getCirculateAirFanActive(this.deviceId)
       ? this.platform.Characteristic.Active.ACTIVE
       : this.platform.Characteristic.Active.INACTIVE);
-    this.platform.log.debug(this.accessory.displayName, '- Get Circulate Air Fan State:', currentState);
+    this.platform.log.debug('%s - Get Circulate Air Fan State: %s', this.accessory.displayName, currentState);
     return currentState;
   }
 
@@ -75,7 +75,7 @@ export class DaikinOnePlusCirculateAirFan {
    * Handle requests to set the "Active" characteristic
    */
   async handleActiveSet(value: CharacteristicValue) {
-    this.platform.log.debug(this.accessory.displayName, '- Set Circulate Air Fan State:', value);
+    this.platform.log.debug('%s - Set Circulate Air Fan State: %s', this.accessory.displayName, value);
     await this.daikinApi.setCirculateAirFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
   }
 
@@ -103,7 +103,7 @@ export class DaikinOnePlusCirculateAirFan {
         currentSpeed = 0;
       }
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get Circulate Air Fan Speed:', currentSpeed);
+    this.platform.log.debug('%s - Get Circulate Air Fan Speed: %d', this.accessory.displayName, currentSpeed);
     return currentSpeed;
   }
 
@@ -111,7 +111,7 @@ export class DaikinOnePlusCirculateAirFan {
    * Handle requests to set the "Rotation Speed" characteristic
    */
   async handleSpeedSet(value: CharacteristicValue) {
-    this.platform.log.debug(this.accessory.displayName, '- Set Circulate Air Fan Speed:', value);
+    this.platform.log.debug('%s - Set Circulate Air Fan Speed: %s', this.accessory.displayName, value);
     const newSpeed = Number(value) - 1;
     await this.daikinApi.setCirculateAirFanSpeed(this.deviceId, newSpeed);
   }

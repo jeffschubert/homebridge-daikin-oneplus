@@ -63,7 +63,7 @@ export class DaikinOnePlusHumidity {
     } else if (currentHumidity > 100) {
       currentHumidity = 100;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get Humidity:', currentHumidity);
+    this.platform.log.debug('%s - Get Humidity: %d', this.accessory.displayName, currentHumidity);
     return currentHumidity;
   }
 }

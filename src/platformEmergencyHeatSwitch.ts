@@ -57,7 +57,7 @@ export class DaikinOnePlusEmergencyHeatSwitch {
       this.daikinApi.deviceHasData(this.deviceId) &&
       this.daikinApi.getTargetState(this.deviceId) === TargetHeatingCoolingState.AUXILIARY_HEAT
     );
-    this.platform.log.debug(this.accessory.displayName, '- Get Emergency Heat State:', currentState);
+    this.platform.log.debug('%s - Get Emergency Heat State: %s', this.accessory.displayName, currentState);
     return currentState;
   }
 
@@ -65,7 +65,7 @@ export class DaikinOnePlusEmergencyHeatSwitch {
    * Handle requests to set the "On" characteristic
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
-    this.platform.log.debug(this.accessory.displayName, '- Set Emergency Heat State:', value);
+    this.platform.log.debug('%s - Set Emergency Heat State: %s', this.accessory.displayName, value);
     await this.daikinApi.setTargetState(this.deviceId, value ? TargetHeatingCoolingState.AUXILIARY_HEAT : TargetHeatingCoolingState.HEAT);
   }
   

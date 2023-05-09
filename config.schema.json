@@ -29,6 +29,12 @@
           "type": "password"
         }
       },
+      "debug": {
+        "title": "Debug Logging",
+        "type": "boolean",
+        "required": false,
+        "description": "Enables debug level logging. Defaults to false."
+      },
       "includeDeviceName": {
         "title": "Include Device Name",
         "description": "Include device name as part of the default sensor name.",
@@ -105,32 +111,26 @@
   },
   "layout": [
     {
-      "type": "flex",
-      "flex-flow": "row wrap",
+      "type": "section",
+      "title": "General",
+      "expandable": true,
+      "expanded": true,
       "items": [
         {
-          "type": "flex",
-          "flex-flow": "column",
+          "description": "Enter your Daikin credentials here.",
           "items": [
             "user",
             "password",
-            "includeDeviceName"
-          ]
-        },
-        {
-          "type": "flex",
-          "flex-flow": "column",
-          "items": [
             "name"
           ]
         }
       ]
     },
     {
-      "ref": "ignore",
-      "type": "fieldset",
-      "expandable": true,
+      "type": "section",
       "title": "Sensor Setup",
+      "expandable": true,
+      "expanded": false,
       "description": "Specify whether specific sensors should not be loaded on start up.",
       "items": [
         "ignoreThermostat",
@@ -141,10 +141,10 @@
       ]
     },
     {
-      "ref": "ignore",
-      "type": "fieldset",
-      "expandable": true,
+      "type": "section",
       "title": "Optional Accessories",
+      "expandable": true,
+      "expanded": false,
       "description": "Extra accessories to control specific aspects of the thermostat.",
       "items": [
         "enableScheduleSwitch",
@@ -153,6 +153,16 @@
         "enableEmergencyHeatSwitch",
         "enableOneCleanFan",
         "enableCirculateAirFan"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Advanced Options",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "debug",
+        "includeDeviceName"
       ]
     }]
 }

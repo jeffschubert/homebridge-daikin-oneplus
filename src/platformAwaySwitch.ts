@@ -60,7 +60,7 @@ export class DaikinOnePlusAwaySwitch {
    * Handle requests to set the "On" characteristic
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
-    this.platform.log.debug(this.accessory.displayName, '- Set Away State:', value);
+    this.platform.log.debug('%s - Set Away State: %s', this.accessory.displayName, value);
     await this.daikinApi.setAwayState(this.deviceId, Boolean(value), this.platform.config.autoResumeSchedule);
   }
   

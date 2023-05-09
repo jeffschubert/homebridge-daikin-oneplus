@@ -98,7 +98,7 @@ export class DaikinOnePlusAQSensor {
         currentValue = this.platform.Characteristic.AirQuality.POOR;
         break;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get AirQuality:', currentValue);
+    this.platform.log.debug('%s - Get AirQuality: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
   
@@ -112,7 +112,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get Ozone:', currentValue);
+    this.platform.log.debug('%s - Get Ozone: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
   
@@ -127,7 +127,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 500) {
       currentValue = 500;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get AirQualityValue:', currentValue);
+    this.platform.log.debug('%s - Get AirQualityValue: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
   
@@ -142,7 +142,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get PM2_5Density:', currentValue);
+    this.platform.log.debug('%s - Get PM2_5Density: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
   
@@ -157,7 +157,7 @@ export class DaikinOnePlusAQSensor {
     } else if (currentValue > 1000) {
       currentValue = 1000;
     }
-    this.platform.log.debug(this.accessory.displayName, '- Get Voc Density:', currentValue);
+    this.platform.log.debug('%s - Get Voc Density: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
 }

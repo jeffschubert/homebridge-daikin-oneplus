@@ -1,24 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosResponse } from 'axios';
 import { hrtime } from 'process';
-
-/**
- * Log levels to indicate importance of the logged message.
- * Every level corresponds to a certain color.
- *
- * - INFO: no color
- * - WARN: yellow
- * - ERROR: red
- * - DEBUG: gray
- *
- * Messages with DEBUG level are only displayed if explicitly enabled.
- */
-export declare const enum LoggerLevel {
-  INFO = 'info',
-  WARN = 'warn',
-  ERROR = 'error',
-  DEBUG = 'debug'
-}
+import { Logging } from 'homebridge';
 
 export declare const enum TargetHeatingCoolingState {
   OFF = 0,
@@ -27,8 +10,6 @@ export declare const enum TargetHeatingCoolingState {
   AUTO = 3,
   AUXILIARY_HEAT = 4
 }
-
-export type LogMessage = (level: LoggerLevel, message: string, ...parameters: any[]) => void
 
 export type DataChanged = () => void
 
@@ -54,12 +35,18 @@ export class DaikinApi{
   private _noUpdateBeforeMs = 0;
   private _updateTimeout?: NodeJS.Timeout;
 
-  constructor(
-      private readonly user : string,
-      private readonly password : string,
-      private readonly log : LogMessage,
-  ){
+  private user: string;
+  private password: string;
+  private log: Logging;
 
+  constructor(
+    user : string,
+    password : string,
+    log : Logging,
+  ){
+    this.log = log;
+    this.user = user;
+    this.password = password;
   }
 
   public addListener(l: DataChanged) {
@@ -80,24 +67,24 @@ export class DaikinApi{
     await this.getToken();
     
     if(this._token === undefined || this._token === null){
-      this.log(LoggerLevel.ERROR, 'Unable to retrieve token.');
+      this.log.error('Unable to retrieve token.');
       return;
     }
 
     await this.getDevices();
 
     if(this._devices !== undefined){
-      this.log(LoggerLevel.INFO, `Found ${this._devices.length} device(s): `);
+      this.log.debug('Found %s devices: ', this._devices.length);
       this._devices.forEach(element => {
-        this.log(LoggerLevel.INFO, `Device: ${element.name}`);
+        this.log.debug('Device: %s', element.name);
       });
     }else {
-      this.log(LoggerLevel.INFO, 'No devices found.');
+      this.log.info('No devices found.');
       return;
     }
 
     await this.getData();
-    this.log(LoggerLevel.INFO, 'Loaded initial data.');
+    this.log.debug('Loaded initial data.');
     this._isInitialized = true;
   }
 
@@ -106,18 +93,18 @@ export class DaikinApi{
   }
 
   async getData(){
-    this.log(LoggerLevel.DEBUG, 'Getting data...');
+    this.log.debug('Getting data...');
     this._devices && this._devices.forEach(async device => {
       const data = await this.getDeviceData(device.id);
       if(!data){
-        this.log(LoggerLevel.ERROR, `Unable to retrieve data for ${device.name}.`);
+        this.log.error('Unable to retrieve data for %s.', device.name);
         return;
       }
       this._updateCache(device.id, data);
-      this.log(LoggerLevel.DEBUG, 'Notifying all listeners');
+      this.log.debug('Notifying all listeners');
       this.notifyListeners();
     });
-    this.log(LoggerLevel.DEBUG, 'Updated data.');
+    this.log.debug('Updated data.');
 
     this._nextUpdateTimeMs = -1;
     this._scheduleUpdate();
@@ -141,23 +128,23 @@ export class DaikinApi{
   _scheduleUpdate(blockUntilMs?: number, asap = false) {
     if (asap) {
       if (blockUntilMs) {
-        this.log(LoggerLevel.ERROR, 'Ignoring blockUntilMs when scheduling ASAP');
+        this.log.error('Ignoring blockUntilMs when scheduling ASAP');
       }
 
       const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
       const minUntilNextUpdateMs = this._noUpdateBeforeMs-this._monotonic_clock_ms();
       if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
         if (minUntilNextUpdateMs <= 0) {
-          this.log(LoggerLevel.DEBUG, 'instant refresh now');
+          this.log.debug('Instant refresh now');
           this._updateIn(0);
         } else {
-          this.log(LoggerLevel.DEBUG, `instant refresh when update is allowed in ${minUntilNextUpdateMs}`);
+          this.log.debug('Instant refresh when update is allowed in %d', minUntilNextUpdateMs);
           this._updateIn(minUntilNextUpdateMs);
         }
       } else {
         const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
         const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
-        this.log(LoggerLevel.DEBUG, `next allowed poll in ${updateInMs}`);
+        this.log.debug('Next allowed poll in %d', updateInMs);
         this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
       }
 
@@ -169,7 +156,7 @@ export class DaikinApi{
       blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
     } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
-      this.log(LoggerLevel.ERROR, `blockUntilMs too small ${blockUntilMs} is less than ${DAIKIN_DEVICE_FOREGROUND_REFRESH_MS}`);
+      this.log.debug('BlockUntilMs too small %d is less than %d', blockUntilMs, DAIKIN_DEVICE_FOREGROUND_REFRESH_MS);
       blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
     } else {
@@ -183,7 +170,7 @@ export class DaikinApi{
       this._updateIn(blockUntilMs > nextUpdateInMs ? blockUntilMs : nextUpdateInMs);
     } else {
       // if the next update is already far enough in the future, nothing else to do
-      this.log(LoggerLevel.DEBUG, `Not rescheduling next update because ${scheduledRunInMs} is after ${blockUntilMs}`);
+      this.log.debug('Not rescheduling next update because %d is after %d', scheduledRunInMs, blockUntilMs);
     }
   }
 
@@ -196,7 +183,7 @@ export class DaikinApi{
       await this.getData();
     }, nextUpdateMs);
     this._nextUpdateTimeMs = this._monotonic_clock_ms() + nextUpdateMs;
-    this.log(LoggerLevel.DEBUG, `scheduled update in ${nextUpdateMs}`);
+    this.log.debug('Scheduled update in %d.', nextUpdateMs);
   }
 
   private _monotonic_clock_ms(): number {
@@ -204,7 +191,7 @@ export class DaikinApi{
   }
 
   async getToken(){
-    this.log(LoggerLevel.DEBUG, 'Getting token...');
+    this.log.debug('Getting token...');
     return axios.post('https://api.daikinskyport.com/users/auth/login', {
       email: this.user,
       password: this.password,
@@ -240,7 +227,7 @@ export class DaikinApi{
     if(typeof this._token === 'undefined' ||
     typeof this._token.refreshToken === 'undefined' ||
     !this._token.refreshToken){
-      this.log(LoggerLevel.DEBUG, 'Cannot refresh token. Getting new token.');
+      this.log.debug('Cannot refresh token. Getting new token.');
       return this.getToken();
     }
     axios.post('https://api.daikinskyport.com/users/auth/token', {
@@ -260,7 +247,7 @@ export class DaikinApi{
       this.refreshToken();
     }
     if(!this._token) {
-      this.log(LoggerLevel.ERROR, `No token for request: ${uri}`);
+      this.log.error('No token for request: %s', uri);
       return Promise.resolve();
     }
     return axios.get(uri, {
@@ -412,7 +399,7 @@ export class DaikinApi{
   async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean>{
     const deviceData = this._cachedDeviceById(deviceId)?.data;
     if(!deviceData){
-      this.log(LoggerLevel.INFO, `Device data could not be retrieved. Unable to set target temp. (${deviceId})`);
+      this.log.info('Device data could not be retrieved. Unable to set target temp. (%s)', deviceId);
       return false;
     }
 
@@ -450,7 +437,7 @@ export class DaikinApi{
         };
         break;
       default:
-        this.log(LoggerLevel.INFO, `Device is in an unknown state: ${deviceData.mode}. Unable to set target temp. (${deviceId})`);
+        this.log.info('Device is in an unknown state: %s. Unable to set target temp. (%s)', deviceData.mode, deviceId);
         return false;
     }
     
@@ -505,7 +492,7 @@ export class DaikinApi{
         schedEnabled: false,
       };    
     }
-    this.log(LoggerLevel.DEBUG, `Schedule for ${deviceId}: ${requestedState}: ${requestedData}`);
+    this.log.debug('Schedule for %s: %s: %s', deviceId, requestedState, requestedData);
     return this.putRequest(deviceId, requestedData, 'setScheduleState', 'Error updating schedule state:');
   }
 
@@ -533,7 +520,7 @@ export class DaikinApi{
   }
 
   private putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean>{
-    this.log(LoggerLevel.DEBUG, `${caller}-> device: ${deviceId}; requestData: ${JSON.stringify(requestData)}`);
+    this.log.debug('%s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
       requestData, {
         headers: {
@@ -543,7 +530,7 @@ export class DaikinApi{
         },
       })
       .then(res => {
-        this.log(LoggerLevel.DEBUG, `${caller}-> device: ${deviceId}; response:${JSON.stringify(res.data)}`);
+        this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
         this._updateCache(deviceId, requestData);
         this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
         return true;
@@ -559,9 +546,9 @@ export class DaikinApi{
         ...partialUpdate,
       };
       cachedDevice.data = updatedData;
-      this.log(LoggerLevel.DEBUG, `Updated cache for ${deviceId} - ${JSON.stringify(partialUpdate)}`);
+      this.log.debug('Updated cache for %s - %s', deviceId, JSON.stringify(partialUpdate));
     } else {
-      this.log(LoggerLevel.ERROR, `Cache update for device that doesn't exist: ${deviceId}`);
+      this.log.error('Cache update for device that doesn\'t exist:', deviceId);
     }
   }
 
@@ -573,21 +560,21 @@ export class DaikinApi{
   }
 
   logError(message: string, error): boolean{
-    this.log(LoggerLevel.ERROR, message);
+    this.log.error(message);
     if (error.response) {
       // When response status code is out of 2xx range 
-      this.log(LoggerLevel.ERROR, 'Error with response:');
-      this.log(LoggerLevel.ERROR, error.response.data);
-      this.log(LoggerLevel.ERROR, error.response.status);
-      this.log(LoggerLevel.ERROR, error.response.headers);
+      this.log.error('Error with response:');
+      this.log.error(error.response.data);
+      this.log.error(error.response.status);
+      this.log.error(error.response.headers);
     } else if (error.request) {
       // When no response was received after request was made
-      this.log(LoggerLevel.ERROR, 'Error with request:');
-      this.log(LoggerLevel.ERROR, error.request);
+      this.log.error('Error with request:');
+      this.log.error(error.request);
     } else {
       // Error
-      this.log(LoggerLevel.ERROR, 'General error:');
-      this.log(LoggerLevel.ERROR, error.message);
+      this.log.error('General error:');
+      this.log.error(error.message);
     }
     return false;
   }

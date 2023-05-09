@@ -60,7 +60,7 @@ export class DaikinOnePlusScheduleSwitch {
    * Handle requests to set the "On" characteristic
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
-    this.platform.log.debug(this.accessory.displayName, '- Set Schedule State:', value);
+    this.platform.log.debug('%s - Set Schedule State: %s', this.accessory.displayName, value);
     await this.daikinApi.setScheduleState(this.deviceId, Boolean(value));
   }
 
