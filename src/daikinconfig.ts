@@ -15,6 +15,7 @@ export interface DaikinOptionsInterface {
   ignoreIndoorHumSensor: boolean,
   ignoreOutdoorHumSensor: boolean,
   ignoreThermostat: boolean,
+  ignoreOutdoorTemp: boolean,
   autoResumeSchedule: boolean,
   }
   

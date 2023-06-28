@@ -305,6 +305,11 @@ export class DaikinApi{
     return device.data.tempIndoor;
   }
 
+  getOutdoorTemp(deviceId: string): number {
+    const device = this._cachedDeviceById(deviceId);
+    return device.data.tempOutdoor;
+  }
+
   getTargetState(deviceId: string): number {
     const device = this._cachedDeviceById(deviceId);
     return device.data.mode;
