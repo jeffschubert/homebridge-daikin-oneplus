@@ -479,19 +479,19 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private discoverOutdoorTemp(device: any) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_otemp`);
-    this.log.debug('checking for outdoor temp...');
+    this.log.debug('checking for Outdoor Temperature...');
     const existingaccessory = this.accessories.find(accessory => accessory.UUID === uuid);
     if (!this.config.ignoreOutdoorTemp) {
-      const dname = this.accessoryName(device, 'outdoor temp');
+      const dname = this.accessoryName(device, 'Outdoor Temperature');
       if (existingaccessory) {
         // the accessory already exists
         existingaccessory.displayName = dname;
         existingaccessory.context.device = device;
-        this.log.debug('restoring existing outdoor temp from cache:', existingaccessory.displayName);
+        this.log.debug('restoring existing Outdoor Temperature from cache:', existingaccessory.displayName);
         new DaikinOnePlusOutdoorTemperature(this, existingaccessory, device.id, this.daikinApi);
       } else {
         // the accessory does not yet exist, so we need to create it
-        this.log.debug('adding new outdoor temp:', dname);
+        this.log.debug('adding new Outdoor Temperature:', dname);
 
         const accessory = new this.api.platformAccessory(dname, uuid);
         accessory.context.device = device;
@@ -499,7 +499,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     } else if (existingaccessory) {
-      this.log.debug('removing outdoor temp from cache:', existingaccessory.displayName);
+      this.log.debug('removing Outdoor Temperature from cache:', existingaccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingaccessory]);
     }
   }
