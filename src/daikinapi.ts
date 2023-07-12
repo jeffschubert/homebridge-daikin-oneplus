@@ -471,38 +471,57 @@ export class DaikinApi{
   }
 
   async setTargetState(deviceId: string, requestedState: number): Promise<boolean>{
-    return this.putRequest(deviceId, {mode: requestedState}, 'setTargetState', 'Error updating target state:');
+    const requestedData = {
+      mode: requestedState,
+    };
+    return this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
   }
 
   async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
-    return this.putRequest(deviceId, {oneCleanFanActive: requestedState}, 'setOneCleanFanActive', 'Error updating OneClean fan:');
+    const requestedData = {
+      oneCleanFanActive: requestedState,
+    };
+    return this.putRequest(deviceId, requestedData, 'setOneCleanFanActive', 'Error updating OneClean fan:');
   }
 
   async setCirculateAirFanActive(deviceId: string, requestedState: boolean): Promise<boolean>{
-    return this.putRequest(deviceId, {fanCirculate: requestedState ? 1 : 0}, 
-      'setCirculateAirFanActive', 'Error updating Circulate Air fan:');
+    const requestedData = {
+      fanCirculate: requestedState ? 1 : 0,
+    };
+    return this.putRequest(deviceId, requestedData, 'setCirculateAirFanActive', 'Error updating Circulate Air fan:');
   }
 
   async setCirculateAirFanSpeed(deviceId: string, requestedSpeed: number): Promise<boolean>{
+    let requestedData;
     if(requestedSpeed === -1){
-      return this.putRequest(deviceId, {fanCirculate: 0, fanCirculateSpeed: 1}, 
-        'setCirculateAirFanSpeed', 'Error updating Circulate Air fan and speed:');
+      requestedData = {
+        fanCirculate: 0, 
+        fanCirculateSpeed: 1,
+      };
     } else {
-      return this.putRequest(deviceId, {fanCirculateSpeed: requestedSpeed}, 
-        'setCirculateAirFanSpeed', 'Error updating Circulate Air fan speed:');
+      requestedData = {
+        fanCirculateSpeed: requestedSpeed,
+      };
     }
+    return this.putRequest(deviceId, requestedData, 'setCirculateAirFanSpeed', 'Error updating Circulate Air fan and speed:');
   }
 
   async setDisplayUnits(deviceId: string, requestedUnits: number) : Promise<boolean>{
-    return this.putRequest(deviceId, {units: requestedUnits}, 'setDisplayUnits', 'Error updating display units:');
+    const requestedData = {
+      units: requestedUnits,
+    };
+    return this.putRequest(deviceId, requestedData, 'setDisplayUnits', 'Error updating display units:');
   }
 
   async setTargetHumidity(deviceId: string, requestedHumidity: number) : Promise<boolean>{
-    return this.putRequest(deviceId, {humSP: requestedHumidity}, 'setTargetHumidity', 'Error updating target humidity:');
+    const requestedData = {
+      humSP: requestedHumidity,
+    };
+    return this.putRequest(deviceId, requestedData, 'setTargetHumidity', 'Error updating target humidity:');
   }
 
   async setScheduleState(deviceId: string, requestedState: boolean): Promise<boolean>{
-    let requestedData = {};
+    let requestedData;
     //  when enabling the schedule state, a schedule must exist.
     if(requestedState){
       requestedData = {
@@ -520,7 +539,7 @@ export class DaikinApi{
   }
 
   async setAwayState(deviceId: string, requestedState: boolean, enableSchedule: boolean): Promise<boolean>{
-    let requestedData = {};
+    let requestedData;
     if(requestedState){
       //  when enabling the away state, the schedule (if it exists) is automatically paused.
       requestedData = {
