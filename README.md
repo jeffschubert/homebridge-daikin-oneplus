@@ -41,7 +41,7 @@
     * Reduce bandwidth by checking the Daikin API every 3 minutes or on demand when interacting with HomeKit (instead of the previous every 10s)
     * After updates, wait up to 15 seconds before checking API to avoid HomeKit showing stale data.
   * Version 3 
-    * Minimum node version increaded to 14
+    * Minimum node version increased to 14
     * Plugin is now verified!
 
 
