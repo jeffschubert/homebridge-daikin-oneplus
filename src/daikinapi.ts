@@ -162,6 +162,8 @@ export class DaikinApi{
       this.log.debug('BlockUntilMs too small %d is less than %d', blockUntilMs, DAIKIN_DEVICE_FOREGROUND_REFRESH_MS);
       blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
+    } else if (blockUntilMs === DAIKIN_DEVICE_WRITE_DELAY_MS){
+      nextUpdateInMs = DAIKIN_DEVICE_WRITE_DELAY_MS;
     } else {
       nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
     }
