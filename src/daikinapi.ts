@@ -39,6 +39,9 @@ export class DaikinApi{
   private password: string;
   private log: Logging;
 
+  private pendingCoolThreshold?: number;
+  private pendingHeatThreshold?: number;
+
   constructor(
     user : string,
     password : string,
@@ -425,16 +428,32 @@ export class DaikinApi{
           cspHome: targetTemp,
         };
         break;
-      case TargetHeatingCoolingState.AUTO:
       case TargetHeatingCoolingState.OFF:
-        if(!heatThreshold || !coolThreshold){
+        // Do nothing when off
+        return true;
+      case TargetHeatingCoolingState.AUTO:
+        //Disregard setting Target Temp when in auto/off
+        if(targetTemp){
+          return true;
+        }
+        if(coolThreshold){
+          // Setting cool threshold for auto
+          this.pendingCoolThreshold = coolThreshold;
+        } else{
+          // Setting heat threshold for auto
+          this.pendingHeatThreshold = heatThreshold;
+        }
+        if(!this.pendingHeatThreshold || !this.pendingCoolThreshold){
           return true;
         }
 
         requestedData = {
-          hspHome: heatThreshold,
-          cspHome: coolThreshold,
+          hspHome: this.pendingHeatThreshold,
+          cspHome: this.pendingCoolThreshold,
         };
+        // Reset pending thresholds
+        this.pendingCoolThreshold = undefined;
+        this.pendingHeatThreshold = undefined;
         break;
       default:
         this.log.info('Device is in an unknown state: %s. Unable to set target temp. (%s)', deviceData.mode, deviceId);
