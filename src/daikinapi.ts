@@ -212,11 +212,13 @@ export class DaikinApi{
   async setToken(response: AxiosResponse<any>){
     this._token = response.data;
     this._tokenExpiration = new Date();
-    //Set expiration a little early.
-    this._tokenExpiration.setSeconds(
-      this._tokenExpiration.getSeconds() 
+
+    const expSeconds = this._tokenExpiration.getSeconds() 
     + this._token.accessTokenExpiresIn 
-    - DAIKIN_DEVICE_BACKGROUND_REFRESH_MS*2);
+    - (DAIKIN_DEVICE_BACKGROUND_REFRESH_MS/1000)*2;
+
+    //Set expiration a little early.
+    this._tokenExpiration.setSeconds(expSeconds);
   }
 
   getDevices(){
