@@ -8,7 +8,7 @@
 
 `homebridge-daikin-oneplus` uses the Daikin One+ API to allow native HomeKit support via Homebridge for any thermostats on your account.
 
-## Accessories and their features (dependant upon your system/equipment capabilities):
+## Accessories and their features (dependent upon your system/equipment capabilities):
   * Thermostat
     * Display current temperature
     * Display and set target temperature
