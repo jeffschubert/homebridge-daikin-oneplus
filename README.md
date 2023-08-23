@@ -80,6 +80,7 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "ignoreOutdoorAqi": false,          // If true, do not load outdoor air quality sensors of thermostats found in Daikin account.
     "ignoreIndoorHumSensor": false,     // If true, do not load indoor humidity sensors of thermostats found in Daikin account.
     "ignoreOutdoorHumSensor": false,    // If true, do not load outdoor humidity sensors of thermostats found in Daikin account.
+    "ignoreOutdoorTemp": false,         // If true, do not load outdoor temperature data of thermostats found in Daiking account.
     "enableAwaySwitch": false,          // If true, enable switch accessory to get/set the Away state of thermostats found in Daikin account.
     "autoResumeSchedule": false,        // If true, enable schedule after Away switch is toggled off.
     "enableEmergencyHeatSwitch": false, // If true, enable switch accessory to request auxiliary/emergency heat only.
