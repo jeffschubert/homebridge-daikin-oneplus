@@ -49,7 +49,7 @@
       },
       "ignoreOutdoorTemp": {
         "title": "Ignore Outdoor Temperature",
-        "description": "Do not load outdoor temperature data from Daikin account",
+        "description": "Do not load outdoor temperature data of thermostats found in Daikin account.",
         "type": "boolean",
         "default": false
       },
@@ -143,7 +143,8 @@
         "ignoreIndoorAqi",
         "ignoreOutdoorAqi",
         "ignoreIndoorHumSensor",
-        "ignoreOutdoorHumSensor"
+        "ignoreOutdoorHumSensor",
+        "ignoreOutdoorTemp"
       ]
     },
     {
