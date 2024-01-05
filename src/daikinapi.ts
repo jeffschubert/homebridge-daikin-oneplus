@@ -35,6 +35,11 @@ export class DaikinApi{
   private _noUpdateBeforeMs = 0;
   private _updateTimeout?: NodeJS.Timeout;
 
+  private _lastWriteStartTimeMs = -1;
+  private _lastWriteFinishTimeMs = -1;
+  private _lastReadStartTimeMs = -1;
+  private _lastReadFinishTimeMs = -1;
+
   private user: string;
   private password: string;
   private log: Logging;
@@ -95,8 +100,17 @@ export class DaikinApi{
     return this._isInitialized;
   }
 
+  //TODO: if writing data or timer exists to write data, don't send get request
+  //TODO: if data received while writing or waiting to write, toss
+  //TODO: if above is done, then gets after, but within write delay time will get delayed.
   async getData(){
     this.log.debug('Getting data...');
+    this._lastReadStartTimeMs = this._monotonic_clock_ms();
+    this._lastReadFinishTimeMs = -1;
+    this.log.debug('GS: %d ; %d ; WT: %d ; %d', 
+      this._lastReadStartTimeMs, this._lastReadFinishTimeMs,
+      this._lastWriteStartTimeMs, this._lastWriteFinishTimeMs);
+
     this._devices && this._devices.forEach(async device => {
       const data = await this.getDeviceData(device.id);
       if(!data){
@@ -108,6 +122,10 @@ export class DaikinApi{
       this.notifyListeners();
     });
     this.log.debug('Updated data.');
+    this._lastReadFinishTimeMs = this._monotonic_clock_ms();
+    this.log.debug('GF: %d ; %d ; WT: %d ; %d', 
+      this._lastReadStartTimeMs, this._lastReadFinishTimeMs,
+      this._lastWriteStartTimeMs, this._lastWriteFinishTimeMs);
 
     this._nextUpdateTimeMs = -1;
     this._scheduleUpdate();
@@ -130,32 +148,42 @@ export class DaikinApi{
    */
   _scheduleUpdate(blockUntilMs?: number, asap = false) {
     if (asap) {
-      if (blockUntilMs) {
-        this.log.error('Ignoring blockUntilMs when scheduling ASAP');
-      }
+      this._scheduleAsap(blockUntilMs);
+    }else {
+      this._scheduleFuture(blockUntilMs);
+    }
+  }
 
-      const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
-      const minUntilNextUpdateMs = this._noUpdateBeforeMs-this._monotonic_clock_ms();
-      if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
-        if (minUntilNextUpdateMs <= 0) {
-          this.log.debug('Instant refresh now');
-          this._updateIn(0);
-        } else {
-          this.log.debug('Instant refresh when update is allowed in %d', minUntilNextUpdateMs);
-          this._updateIn(minUntilNextUpdateMs);
-        }
-      } else {
-        const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
-        const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
-        this.log.debug('Next allowed poll in %d', updateInMs);
-        this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
-      }
-
-      return;
+  private _scheduleAsap(blockUntilMs?: number){
+    if (blockUntilMs) {
+      this.log.error('Ignoring blockUntilMs when scheduling ASAP');
     }
 
+    const sinceLastUpdateMs = this._monotonic_clock_ms()-this._lastUpdateTimeMs;
+    const minUntilNextUpdateMs = this._noUpdateBeforeMs-this._monotonic_clock_ms();
+    if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
+      if (minUntilNextUpdateMs <= 0) {
+        this.log.debug('Instant refresh now');
+        this._updateIn(0);
+      } else {
+        this.log.debug('Instant refresh when update is allowed in %d', minUntilNextUpdateMs);
+        this._updateIn(minUntilNextUpdateMs);
+      }
+    } else {
+      const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
+      const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
+      this.log.debug('Next allowed poll in %d', updateInMs);
+      this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
+    }
+  }
+
+  private _scheduleFuture(blockUntilMs?: number){
     let nextUpdateInMs:number;
+    // set how long to wait to do an update (blockUntilMs)
+    // and when the next update should happen (nextUpdateInMs)
+    // as of 8/25/23, blockUntilMs will either be undefined or DAIKIN_DEVICE_WRITE_DELAY_MS only
     if (!blockUntilMs) {
+      // just got data
       blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
       nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
     } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
@@ -566,8 +594,18 @@ export class DaikinApi{
     return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
   }
 
+  //TODO: track data to be written per device
+  //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for device)
+  //TODO: reset timer on every device's request. once there's a full second without a request, then send? 
+  //TODO: always update cache data with requested so that local stays current with what will be state once written.
   private putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean>{
-    this.log.debug('%s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
+    this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
+    this._lastWriteStartTimeMs = this._monotonic_clock_ms();
+    this._lastWriteFinishTimeMs = -1;
+    this.log.debug('WS: %d ; %d ; GT: %d ; %d', 
+      this._lastWriteStartTimeMs, this._lastWriteFinishTimeMs, 
+      this._lastReadStartTimeMs, this._lastReadFinishTimeMs);
+                  
     return axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, 
       requestData, {
         headers: {
@@ -578,11 +616,19 @@ export class DaikinApi{
       })
       .then(res => {
         this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
+        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+        this.log.debug('WF: %d ; %d ; GT: %d ; %d', 
+          this._lastWriteStartTimeMs, this._lastWriteFinishTimeMs, 
+          this._lastReadStartTimeMs, this._lastReadFinishTimeMs);
         this._updateCache(deviceId, requestData);
         this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
         return true;
       })
-      .catch((error) => this.logError(errorHeader, error));
+      .catch((error) => {
+        this.logError(errorHeader, error);
+        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+        return false;
+      });
   }
 
   private _updateCache(deviceId: string, partialUpdate: any) {
@@ -593,7 +639,8 @@ export class DaikinApi{
         ...partialUpdate,
       };
       cachedDevice.data = updatedData;
-      this.log.debug('Updated cache for %s - %s', deviceId, JSON.stringify(partialUpdate));
+      //this.log.debug('Updated cache for %s - %s', deviceId, JSON.stringify(partialUpdate));
+      this.log.debug('Updated cache for %s', deviceId);
     } else {
       this.log.error('Cache update for device that doesn\'t exist:', deviceId);
     }
