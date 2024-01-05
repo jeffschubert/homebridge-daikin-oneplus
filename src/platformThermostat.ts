@@ -69,7 +69,7 @@ export class DaikinOnePlusThermostat {
       .setProps({
         minValue: 12,
         maxValue: 32,
-        minStep: 0.5,
+        minStep: 0.1,
       });
 
     this.service.getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
@@ -81,7 +81,7 @@ export class DaikinOnePlusThermostat {
       .setProps({
         minValue: 10,
         maxValue: 30,
-        minStep: 0.5,
+        minStep: 0.1,
       });
 
     this.service.getCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits)
@@ -229,10 +229,10 @@ export class DaikinOnePlusThermostat {
   handleTargetTemperatureGet(): CharacteristicValue {
     let targetTemp = this.daikinApi.getTargetTemp(this.deviceId);
     // set this to a valid value for CurrentTemperature
-    if(targetTemp < -270) {
-      targetTemp = -270;
-    } else if (targetTemp > 100) {
-      targetTemp = 100;
+    if(targetTemp < 10) {
+      targetTemp = 10;
+    } else if (targetTemp > 38) {
+      targetTemp = 38;
     }
     this.platform.log.debug('%s - Get TargetTemperature: %f', this.accessory.displayName, targetTemp);
     return targetTemp;
