@@ -595,7 +595,7 @@ export class DaikinApi{
   }
 
   //TODO: track data to be written per device
-  //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for device)
+  //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for it)
   //TODO: reset timer on every device's request. once there's a full second without a request, then send? 
   //TODO: always update cache data with requested so that local stays current with what will be state once written.
   private putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean>{
