@@ -326,7 +326,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     if(!this.config.ignoreIndoorAqi){
       const dName = this.accessoryName(device, 'Indoor AQI');
-      if (deviceData.aqIndoorAvailable) {
+      if (deviceData && deviceData.aqIndoorAvailable) {
         if (existingAccessory) {
         // the accessory already exists
           existingAccessory.displayName = dName;
@@ -362,7 +362,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     if(!this.config.ignoreOutdoorAqi){
       const dName = this.accessoryName(device, 'Outdoor AQI');
-      if (deviceData.aqOutdoorAvailable) {
+      if (deviceData && deviceData.aqOutdoorAvailable) {
         if (existingAccessory) {
         // the accessory already exists
           existingAccessory.displayName = dName;
