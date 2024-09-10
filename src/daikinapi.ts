@@ -363,9 +363,9 @@ export class DaikinApi{
     switch(device.data.mode){
       case TargetHeatingCoolingState.HEAT:
       case TargetHeatingCoolingState.AUXILIARY_HEAT:
+      case TargetHeatingCoolingState.AUTO:
         return device.data.hspActive;
       case TargetHeatingCoolingState.COOL:
-      case TargetHeatingCoolingState.AUTO:
       default:
         return device.data.cspActive;
     }
