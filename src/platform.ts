@@ -153,7 +153,10 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     for (const device of devices) {
       this.log.info('Found device: %s', device.name);
       const deviceData = await this.daikinApi.getDeviceData(device.id);
-
+      if(!deviceData){
+        this.log.error('Unable to retrieve data for known device: %s. Device may be offline.', device.name);
+        continue;
+      }
       this.discoverThermostat(device);
       this.discoverOutdoorTemp(device);
       this.discoverOutdoorHumSensor(device);
