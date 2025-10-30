@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Daikin One+",
   "name": "homebridge-daikin-oneplus",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "description": "Control a Daikin One+ thermostat.",
   "license": "Apache-2.0",
   "repository": {
@@ -12,8 +12,8 @@
     "url": "https://github.com/jeffschubert/homebridge-daikin-oneplus/issues"
   },
   "engines": {
-    "node": ">=18.17.0",
-    "homebridge": ">=1.6.0"
+    "node": "^18.20.4 || ^20.15.1 || ^22",
+    "homebridge": "^1.6.0 || ^2.0.0-beta.0"
   },
   "funding": {
     "type": "paypal",
