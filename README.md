@@ -7,7 +7,7 @@
 ## HomeKit support for Daikin One+ thermostats using [Homebridge](https://homebridge.io)
 
 `homebridge-daikin-oneplus` uses the Daikin One+ API to allow native HomeKit support via Homebridge for any thermostats on your account.
-
+> This plugin has been reported to work with Amana Home Wifi thermostats. No guarantees, but if it works with yours, drop a note in [this discussion](https://github.com/jeffschubert/homebridge-daikin-oneplus/discussions/52). 
 ## Accessories and their features (dependent upon your system/equipment capabilities):
   * Thermostat
     * Display current temperature
