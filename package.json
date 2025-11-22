@@ -12,8 +12,8 @@
     "url": "https://github.com/jeffschubert/homebridge-daikin-oneplus/issues"
   },
   "engines": {
-    "node": ">=18.17.0",
-    "homebridge": "^1.6.0 || ^2.0.0-beta.0"
+    "node": "^20.18.0 || ^22.10.0 || ^24.0.0",
+    "homebridge": "^1.8.0 || ^2.0.0-beta.0"
   },
   "funding": {
     "type": "paypal",
