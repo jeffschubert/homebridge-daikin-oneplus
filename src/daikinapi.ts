@@ -111,16 +111,18 @@ export class DaikinApi{
       this._lastReadStartTimeMs, this._lastReadFinishTimeMs,
       this._lastWriteStartTimeMs, this._lastWriteFinishTimeMs);
 
-    this._devices && this._devices.forEach(async device => {
-      const data = await this.getDeviceData(device.id);
-      if(!data){
-        this.log.error('Unable to retrieve data for %s.', device.name);
-        return;
-      }
-      this._updateCache(device.id, data);
-      this.log.debug('Notifying all listeners');
-      this.notifyListeners();
-    });
+    if (this._devices) {
+      this._devices.forEach(async device => {
+        const data = await this.getDeviceData(device.id);
+        if(!data){
+          this.log.error('Unable to retrieve data for %s.', device.name);
+          return;
+        }
+        this._updateCache(device.id, data);
+        this.log.debug('Notifying all listeners');
+        this.notifyListeners();
+      });
+    }
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
     this.log.debug('GF: %d ; %d ; WT: %d ; %d', 
