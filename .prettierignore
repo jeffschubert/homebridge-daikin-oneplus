@@ -1,0 +1,9 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Config files that don't need formatting
+*.json
+*.md

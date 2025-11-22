@@ -1,13 +1,4 @@
-import { 
-  API, 
-  APIEvent, 
-  Characteristic, 
-  DynamicPlatformPlugin, 
-  Logging, 
-  PlatformAccessory, 
-  PlatformConfig, 
-  Service, 
-} from 'homebridge';
+import { API, APIEvent, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DaikinOnePlusThermostat } from './platformThermostat';
@@ -28,25 +19,19 @@ import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature';
  * parse the user config and discover/register accessories with Homebridge.
  */
 export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
-
   // this is used to track restored cached accessories
   private readonly accessories: PlatformAccessory[];
   public readonly api: API;
   public config!: DaikinOptionsInterface;
   public readonly log: Logging;
-  
+
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
 
   private readonly daikinApi!: DaikinApi;
   private discoverTimer!: NodeJS.Timeout;
 
-  constructor(
-    log: Logging,
-    config: PlatformConfig,
-    api: API,
-  ) {
-
+  constructor(log: Logging, config: PlatformConfig, api: API) {
     this.accessories = [];
     this.api = api;
     this.log = log;
@@ -55,7 +40,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.Characteristic = this.api.hap.Characteristic;
 
     //Don't start if not configured
-    if(!config){
+    if (!config) {
       this.log.error('Not configured.');
       return;
     }
@@ -63,23 +48,23 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       debug: config.debug === true,
       user: config.user as string,
       password: config.password as string,
-      includeDeviceName: config.includeDeviceName as boolean ?? false,
+      includeDeviceName: (config.includeDeviceName as boolean) ?? false,
       name: config.name as string,
-      enableEmergencyHeatSwitch: 'enableEmergencyHeatSwitch' in config ? config.enableEmergencyHeatSwitch as boolean : false,
-      enableOneCleanFan: 'enableOneCleanFan' in config ? config.enableOneCleanFan as boolean : false,
-      enableCirculateAirFan: 'enableCirculateAirFan' in config ? config.enableCirculateAirFan as boolean : false,
-      enableScheduleSwitch: 'enableScheduleSwitch' in config ? config.enableScheduleSwitch as boolean : false,
-      enableAwaySwitch: 'enableAwaySwitch' in config ? config.enableAwaySwitch as boolean : false,
-      ignoreIndoorAqi: 'ignoreIndoorAqi' in config ? config.ignoreIndoorAqi as boolean : false,
-      ignoreOutdoorAqi: 'ignoreOutdoorAqi' in config ? config.ignoreOutdoorAqi as boolean : false,
-      ignoreIndoorHumSensor: 'ignoreIndoorHumSensor' in config ? config.ignoreIndoorHumSensor as boolean : false,
-      ignoreOutdoorHumSensor: 'ignoreOutdoorHumSensor' in config ? config.ignoreOutdoorHumSensor as boolean : false,
-      ignoreThermostat: 'ignoreThermostat' in config ? config.ignoreThermostat as boolean : false,
-      ignoreOutdoorTemp: 'ignoreOutdoorTemp' in config ? config.ignoreOutdoorTemp as boolean : false,
-      autoResumeSchedule: 'autoResumeSchedule' in config ? config.autoResumeSchedule as boolean : false,
+      enableEmergencyHeatSwitch: 'enableEmergencyHeatSwitch' in config ? (config.enableEmergencyHeatSwitch as boolean) : false,
+      enableOneCleanFan: 'enableOneCleanFan' in config ? (config.enableOneCleanFan as boolean) : false,
+      enableCirculateAirFan: 'enableCirculateAirFan' in config ? (config.enableCirculateAirFan as boolean) : false,
+      enableScheduleSwitch: 'enableScheduleSwitch' in config ? (config.enableScheduleSwitch as boolean) : false,
+      enableAwaySwitch: 'enableAwaySwitch' in config ? (config.enableAwaySwitch as boolean) : false,
+      ignoreIndoorAqi: 'ignoreIndoorAqi' in config ? (config.ignoreIndoorAqi as boolean) : false,
+      ignoreOutdoorAqi: 'ignoreOutdoorAqi' in config ? (config.ignoreOutdoorAqi as boolean) : false,
+      ignoreIndoorHumSensor: 'ignoreIndoorHumSensor' in config ? (config.ignoreIndoorHumSensor as boolean) : false,
+      ignoreOutdoorHumSensor: 'ignoreOutdoorHumSensor' in config ? (config.ignoreOutdoorHumSensor as boolean) : false,
+      ignoreThermostat: 'ignoreThermostat' in config ? (config.ignoreThermostat as boolean) : false,
+      ignoreOutdoorTemp: 'ignoreOutdoorTemp' in config ? (config.ignoreOutdoorTemp as boolean) : false,
+      autoResumeSchedule: 'autoResumeSchedule' in config ? (config.autoResumeSchedule as boolean) : false,
     };
 
-    if(!this.config.user || !this.config.password) {
+    if (!this.config.user || !this.config.password) {
       this.log.error('No Daikin login credentials configured.');
       return;
     }
@@ -104,12 +89,12 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     clearTimeout(this.discoverTimer);
 
     //If initialized, no need to try and discover devices again.
-    if(this.daikinApi.isInitialized()){
+    if (this.daikinApi.isInitialized()) {
       return;
     }
 
-    this.discoverTimer = setTimeout(()=>{
-      void (async():Promise<void>=>{
+    this.discoverTimer = setTimeout(() => {
+      void (async (): Promise<void> => {
         // run the method to discover / register your devices as accessories
         await this.discoverDevices();
 
@@ -136,14 +121,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   async discoverDevices() {
-    if(!this.config.user && !this.config.password) {
+    if (!this.config.user && !this.config.password) {
       this.log.error('Credentials not set. Aborting discovery of devices.');
       return;
     }
 
     await this.daikinApi.Initialize();
 
-    if(!this.daikinApi.isInitialized()){
+    if (!this.daikinApi.isInitialized()) {
       this.log.error('Unable to retrieve devices. Aborting discovery of devices.');
       return;
     }
@@ -324,17 +309,17 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for indoor Air Quality sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if(!this.config.ignoreIndoorAqi){
+    if (!this.config.ignoreIndoorAqi) {
       const dName = this.accessoryName(device, 'Indoor AQI');
       if (deviceData && deviceData.aqIndoorAvailable) {
         if (existingAccessory) {
-        // the accessory already exists
+          // the accessory already exists
           existingAccessory.displayName = dName;
           existingAccessory.context.device = device;
           this.log.debug('Restoring existing indoor Air Quality sensor from cache:', existingAccessory.displayName);
           new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, true);
         } else {
-        // the accessory does not yet exist, so we need to create it
+          // the accessory does not yet exist, so we need to create it
           this.log.debug('Adding new indoor Air Quality sensor:', dName);
 
           const accessory = new this.api.platformAccessory(dName, uuid);
@@ -351,7 +336,6 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.log.debug('Removing Indoor AQI sensor from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
-
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -360,17 +344,17 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for outdoor Air Quality sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if(!this.config.ignoreOutdoorAqi){
+    if (!this.config.ignoreOutdoorAqi) {
       const dName = this.accessoryName(device, 'Outdoor AQI');
       if (deviceData && deviceData.aqOutdoorAvailable) {
         if (existingAccessory) {
-        // the accessory already exists
+          // the accessory already exists
           existingAccessory.displayName = dName;
           existingAccessory.context.device = device;
           this.log.debug('Restoring existing outdoor Air Quality sensor from cache:', existingAccessory.displayName);
           new DaikinOnePlusAQSensor(this, existingAccessory, device.id, this.daikinApi, false);
         } else {
-        // the accessory does not yet exist, so we need to create it
+          // the accessory does not yet exist, so we need to create it
           this.log.debug('Adding new outdoor Air Quality sensor:', dName);
 
           const accessory = new this.api.platformAccessory(dName, uuid);
@@ -383,7 +367,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
     } else if (existingAccessory) {
-    //Delete any existing Outdoor AQI sensor
+      //Delete any existing Outdoor AQI sensor
       this.log.debug('Removing Outdoor AQI sensor from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
@@ -394,16 +378,16 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     const uuid = this.api.hap.uuid.generate(`${device.id}_ihum`);
     this.log.debug('Checking for indoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-    if(!this.config.ignoreIndoorHumSensor){
+    if (!this.config.ignoreIndoorHumSensor) {
       const dName = this.accessoryName(device, 'Indoor Humidity');
       if (existingAccessory) {
-      // the accessory already exists
+        // the accessory already exists
         existingAccessory.displayName = dName;
         existingAccessory.context.device = device;
         this.log.debug('Restoring existing indoor humidity sensor from cache:', existingAccessory.displayName);
         new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, true);
       } else {
-      // the accessory does not yet exist, so we need to create it
+        // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new indoor humidity sensor:', dName);
 
         const accessory = new this.api.platformAccessory(dName, uuid);
@@ -412,7 +396,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     } else if (existingAccessory) {
-    //Delete any existing Indoor Humidity sensor
+      //Delete any existing Indoor Humidity sensor
       this.log.debug('Removing Indoor Humidity sensor from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
@@ -424,16 +408,16 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for outdoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if(!this.config.ignoreOutdoorHumSensor){
+    if (!this.config.ignoreOutdoorHumSensor) {
       const dName = this.accessoryName(device, 'Outdoor Humidity');
       if (existingAccessory) {
-      // the accessory already exists
+        // the accessory already exists
         existingAccessory.displayName = dName;
         existingAccessory.context.device = device;
         this.log.debug('Restoring existing outdoor humidity sensor from cache:', existingAccessory.displayName);
         new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, false);
       } else {
-      // the accessory does not yet exist, so we need to create it
+        // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new outdoor humidity sensor:', dName);
 
         const accessory = new this.api.platformAccessory(dName, uuid);
@@ -442,7 +426,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     } else if (existingAccessory) {
-    //Delete any existing Outdoor Humidity sensor
+      //Delete any existing Outdoor Humidity sensor
       this.log.debug('Removing Outdoor Humidity sensor from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
@@ -505,12 +489,12 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private accessoryName(device: any, accessory: string){
+  private accessoryName(device: any, accessory: string) {
     return this.config.includeDeviceName ? `${device.name} ${accessory}` : accessory;
   }
 
   public debug(message: string, ...parameters: unknown[]): void {
-    if(this.config.debug) {
+    if (this.config.debug) {
       this.log.info(message, ...parameters);
     }
   }
