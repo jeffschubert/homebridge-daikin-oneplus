@@ -93,6 +93,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     this.discoverTimer = setTimeout(async () => {
       try {
         // run the method to discover / register your devices as accessories

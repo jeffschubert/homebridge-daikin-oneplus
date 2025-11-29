@@ -217,9 +217,15 @@ export class DaikinApi {
     if (this._updateTimeout) {
       clearTimeout(this._updateTimeout);
     }
-    this._updateTimeout = setTimeout(async () => {
-      this._lastUpdateTimeMs = this._monotonic_clock_ms();
-      await this.getData();
+    this._updateTimeout = setTimeout(() => {
+      void (async () => {
+        this._lastUpdateTimeMs = this._monotonic_clock_ms();
+        try {
+          await this.getData();
+        } catch (err) {
+          this.logError('Error in scheduled update:', err);
+        }
+      })();
     }, nextUpdateMs);
     this._nextUpdateTimeMs = this._monotonic_clock_ms() + nextUpdateMs;
     this.log.debug('Scheduled update in %d.', nextUpdateMs);
@@ -251,7 +257,7 @@ export class DaikinApi {
     }
   }
 
-  async setToken(response: AxiosResponse<any>) {
+  setToken(response: AxiosResponse<any>) {
     this._token = response.data;
     this._tokenExpiration = new Date();
 
@@ -299,7 +305,7 @@ export class DaikinApi {
 
   async getRequest(uri: string) {
     if (new Date() >= this._tokenExpiration) {
-      this.refreshToken();
+      await this.refreshToken();
     }
     if (!this._token) {
       this.log.error('No token for request: %s', uri);
