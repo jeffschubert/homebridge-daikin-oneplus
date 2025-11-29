@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi, TargetHeatingCoolingState } from './daikinapi';
+import { DaikinApi, TargetHeatingCoolingState } from './daikinapi.js';
 
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
  * Emergency Heat Switch

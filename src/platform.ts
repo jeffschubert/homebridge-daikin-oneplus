@@ -1,17 +1,17 @@
 import { API, APIEvent, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { DaikinOnePlusThermostat } from './platformThermostat';
-import { DaikinOnePlusAQSensor } from './platformAQI';
-import { DaikinOnePlusHumidity } from './platformHumidity';
-import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch';
-import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch';
-import { DaikinApi } from './daikinapi';
-import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch';
-import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan';
-import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan';
+import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
+import { DaikinOnePlusThermostat } from './platformThermostat.js';
+import { DaikinOnePlusAQSensor } from './platformAQI.js';
+import { DaikinOnePlusHumidity } from './platformHumidity.js';
+import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch.js';
+import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch.js';
+import { DaikinApi } from './daikinapi.js';
+import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch.js';
+import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan.js';
+import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
 import { DaikinOptionsInterface } from './daikinconfig.js';
-import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature';
+import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
 
 /**
  * HomebridgePlatform

@@ -20,6 +20,7 @@
     "url": "https://paypal.me/schooby41"
   },
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "lint": "eslint src/**.ts --max-warnings=0",
     "format": "prettier --write \"src/**/*.ts\"",

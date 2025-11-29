@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi } from './daikinapi';
+import { DaikinApi } from './daikinapi.js';
 
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 export class DaikinOnePlusOutdoorTemperature {
   private service: Service;
