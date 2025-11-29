@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
 import { FlatCompat } from "@eslint/eslintrc";
+import promisePlugin from "eslint-plugin-promise";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,10 @@ export default defineConfig([globalIgnores(["**/dist"]), {
         "plugin:@typescript-eslint/recommended",
         "prettier",
     ),
+
+    plugins: {
+        promise: promisePlugin,
+    },
 
     languageOptions: {
         parser: tsParser,
@@ -38,5 +43,9 @@ export default defineConfig([globalIgnores(["**/dist"]), {
         "@typescript-eslint/explicit-function-return-type": "off",
         "@typescript-eslint/no-non-null-assertion": "off",
         "@typescript-eslint/explicit-module-boundary-types": "off",
+
+        // Enforce async/await over .then()/.catch()
+        "promise/prefer-await-to-then": "error",
+        "promise/prefer-await-to-callbacks": "warn",
     },
 }]);

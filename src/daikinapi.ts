@@ -112,16 +112,16 @@ export class DaikinApi {
     );
 
     if (this._devices) {
-      this._devices.forEach(async device => {
+      for (const device of this._devices) {
         const data = await this.getDeviceData(device.id);
         if (!data) {
           this.log.error('Unable to retrieve data for %s.', device.name);
-          return;
+          continue;
         }
         this._updateCache(device.id, data);
         this.log.debug('Notifying all listeners');
         this.notifyListeners();
-      });
+      }
     }
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
@@ -231,8 +231,8 @@ export class DaikinApi {
 
   async getToken() {
     this.log.debug('Getting token...');
-    return axios
-      .post(
+    try {
+      const response = await axios.post(
         'https://api.daikinskyport.com/users/auth/login',
         {
           email: this.user,
@@ -244,9 +244,11 @@ export class DaikinApi {
             'Content-Type': 'application/json',
           },
         },
-      )
-      .then(response => this.setToken(response))
-      .catch(error => this.logError('Error getting token:', error));
+      );
+      this.setToken(response);
+    } catch (error) {
+      this.logError('Error getting token:', error);
+    }
   }
 
   async setToken(response: AxiosResponse<any>) {
@@ -260,21 +262,23 @@ export class DaikinApi {
     this._tokenExpiration.setSeconds(expSeconds);
   }
 
-  getDevices() {
-    return this.getRequest('https://api.daikinskyport.com/devices').then(response => (this._devices = response));
+  async getDevices() {
+    const response = await this.getRequest('https://api.daikinskyport.com/devices');
+    this._devices = response;
+    return this._devices;
   }
 
   getDeviceData(device) {
     return this.getRequest(`https://api.daikinskyport.com/deviceData/${device}`);
   }
 
-  refreshToken() {
+  async refreshToken() {
     if (typeof this._token === 'undefined' || typeof this._token.refreshToken === 'undefined' || !this._token.refreshToken) {
       this.log.debug('Cannot refresh token. Getting new token.');
       return this.getToken();
     }
-    axios
-      .post(
+    try {
+      const response = await axios.post(
         'https://api.daikinskyport.com/users/auth/token',
         {
           email: this.user,
@@ -286,31 +290,33 @@ export class DaikinApi {
             'Content-Type': 'application/json',
           },
         },
-      )
-      .then(response => this.setToken(response))
-      .catch(error => this.logError('Error refreshing token:', error));
+      );
+      this.setToken(response);
+    } catch (error) {
+      this.logError('Error refreshing token:', error);
+    }
   }
 
-  getRequest(uri: string) {
+  async getRequest(uri: string) {
     if (new Date() >= this._tokenExpiration) {
       this.refreshToken();
     }
     if (!this._token) {
       this.log.error('No token for request: %s', uri);
-      return Promise.resolve();
+      return undefined;
     }
-    return axios
-      .get(uri, {
+    try {
+      const response = await axios.get(uri, {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
-      })
-      .then(response => response.data)
-      .catch(error => {
-        this.logError(`Error with getRequest: ${uri}`, error);
-        return Promise.resolve();
       });
+      return response.data;
+    } catch (error) {
+      this.logError(`Error with getRequest: ${uri}`, error);
+      return undefined;
+    }
   }
 
   getDeviceList() {
@@ -620,7 +626,7 @@ export class DaikinApi {
   //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for it)
   //TODO: reset timer on every device's request. once there's a full second without a request, then send?
   //TODO: always update cache data with requested so that local stays current with what will be state once written.
-  private putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean> {
+  private async putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean> {
     this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
     this._lastWriteFinishTimeMs = -1;
@@ -632,33 +638,31 @@ export class DaikinApi {
       this._lastReadFinishTimeMs,
     );
 
-    return axios
-      .put(`https://api.daikinskyport.com/deviceData/${deviceId}`, requestData, {
+    try {
+      const res = await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, requestData, {
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
-      })
-      .then(res => {
-        this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
-        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
-        this.log.debug(
-          'WF: %d ; %d ; GT: %d ; %d',
-          this._lastWriteStartTimeMs,
-          this._lastWriteFinishTimeMs,
-          this._lastReadStartTimeMs,
-          this._lastReadFinishTimeMs,
-        );
-        this._updateCache(deviceId, requestData);
-        this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
-        return true;
-      })
-      .catch(error => {
-        this.logError(errorHeader, error);
-        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
-        return false;
       });
+      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
+      this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+      this.log.debug(
+        'WF: %d ; %d ; GT: %d ; %d',
+        this._lastWriteStartTimeMs,
+        this._lastWriteFinishTimeMs,
+        this._lastReadStartTimeMs,
+        this._lastReadFinishTimeMs,
+      );
+      this._updateCache(deviceId, requestData);
+      this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
+      return true;
+    } catch (error) {
+      this.logError(errorHeader, error);
+      this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+      return false;
+    }
   }
 
   private _updateCache(deviceId: string, partialUpdate: any) {

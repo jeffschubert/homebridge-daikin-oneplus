@@ -93,14 +93,18 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.discoverTimer = setTimeout(() => {
-      void (async (): Promise<void> => {
+    this.discoverTimer = setTimeout(async () => {
+      try {
         // run the method to discover / register your devices as accessories
         await this.discoverDevices();
 
         //Call discover again in case we failed to initialize the api and discover devices.
         this.discover();
-      })();
+      } catch (error) {
+        this.log.error('Discovery failed:', error);
+        // Retry discovery on failure
+        this.discover();
+      }
     }, 10 * 1000);
   }
 
