@@ -323,7 +323,15 @@ export class DaikinOnePlusThermostat {
     // set this to a valid value for CurrentHeatingCoolingState
     switch (value) {
       case this.platform.Characteristic.TargetHeatingCoolingState.HEAT:
-        requestedState = ThermostatMode.HEAT;
+        // Honor emergency heat switch: if it's ON, use EMERGENCY_HEAT instead of HEAT.
+        // HomeKit scenes capture all characteristics, so a scene that turns on emergency heat
+        // may also send HEAT mode - we use the switch state to determine user intent.
+        if (this.daikinApi.isEmergencyHeatEnabled(this.deviceId)) {
+          this.platform.log.debug('%s - Using emergency heat (switch is ON)', this.accessory.displayName);
+          requestedState = ThermostatMode.EMERGENCY_HEAT;
+        } else {
+          requestedState = ThermostatMode.HEAT;
+        }
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.COOL:
         requestedState = ThermostatMode.COOL;

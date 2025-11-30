@@ -57,6 +57,10 @@ export class DaikinApi {
   private pendingCoolThreshold?: number;
   private pendingHeatThreshold?: number;
 
+  // Track emergency heat switch state per device. When the switch is ON, thermostat
+  // mode changes to HEAT should use EMERGENCY_HEAT instead.
+  private _emergencyHeatEnabled: Map<string, boolean> = new Map();
+
   constructor(user: string, password: string, log: Logging) {
     this.log = log;
     this.user = user;
@@ -459,12 +463,16 @@ export class DaikinApi {
     return this._cachedDeviceById(deviceId).data.geofencingAway;
   }
 
+  setEmergencyHeatEnabled(deviceId: string, enabled: boolean): void {
+    this._emergencyHeatEnabled.set(deviceId, enabled);
+  }
+
+  isEmergencyHeatEnabled(deviceId: string): boolean {
+    return this._emergencyHeatEnabled.get(deviceId) ?? false;
+  }
+
   async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean> {
-    const deviceData = this._cachedDeviceById(deviceId)?.data;
-    if (!deviceData) {
-      this.log.info('Device data could not be retrieved. Unable to set target temp. (%s)', deviceId);
-      return false;
-    }
+    const deviceData = this._cachedDeviceById(deviceId).data;
 
     // apiData: fields to send to API (only writable fields)
     // cacheUpdate: fields to update in local cache (includes read-only derived fields for immediate UI feedback)
