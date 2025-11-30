@@ -39,20 +39,18 @@ export class DaikinOnePlusScheduleSwitch {
       })
       .onSet(this.handleCurrentStateSet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    const value = this.handleCurrentStateGet();
-    this.service.updateCharacteristic(this.platform.Characteristic.On, value);
+    this.service.updateCharacteristic(this.platform.Characteristic.On, this.handleCurrentStateGet());
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
   handleCurrentStateGet(): boolean {
-    return this.daikinApi.deviceHasData(this.deviceId) && this.daikinApi.getScheduleState(this.deviceId);
+    return this.daikinApi.getScheduleState(this.deviceId);
   }
 
   /**

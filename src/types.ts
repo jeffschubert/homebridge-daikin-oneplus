@@ -50,10 +50,10 @@ export const enum AirQualityLevel {
 }
 
 /**
- * Device information returned from the /devices endpoint.
- * This represents a thermostat in the user's account.
+ * Basic device information returned from the /devices endpoint.
+ * Contains static device metadata that doesn't change during runtime.
  */
-export interface Thermostat {
+export interface ThermostatInfo {
   /** Unique device identifier (UUID format) */
   id: string;
   /** User-assigned device name */
@@ -62,8 +62,16 @@ export interface Thermostat {
   model: string;
   /** Current firmware version */
   firmwareVersion: string;
-  /** Cached device data (populated after getDeviceData call) */
-  data: ThermostatData;
+}
+
+/**
+ * Device information with optional cached data.
+ * Data is populated after getDeviceData call and may be undefined
+ * between device discovery and first data fetch.
+ */
+export interface Thermostat extends ThermostatInfo {
+  /** Cached device data (undefined until getDeviceData is called) */
+  data?: ThermostatData;
 }
 
 /**

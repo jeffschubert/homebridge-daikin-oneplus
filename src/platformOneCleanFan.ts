@@ -39,23 +39,20 @@ export class DaikinOnePlusOneCleanFan {
       })
       .onSet(this.handleActiveSet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    const value = this.handleActiveGet();
-    this.service.updateCharacteristic(this.platform.Characteristic.Active, value);
+    this.service.updateCharacteristic(this.platform.Characteristic.Active, this.handleActiveGet());
   }
 
   /**
    * Handle requests to get the current value of the "Active" characteristic
    */
   handleActiveGet() {
-    const currentState =
-      this.daikinApi.deviceHasData(this.deviceId) && this.daikinApi.getOneCleanFanActive(this.deviceId)
-        ? this.platform.Characteristic.Active.ACTIVE
-        : this.platform.Characteristic.Active.INACTIVE;
+    const currentState = this.daikinApi.getOneCleanFanActive(this.deviceId)
+      ? this.platform.Characteristic.Active.ACTIVE
+      : this.platform.Characteristic.Active.INACTIVE;
     this.platform.log.debug('%s - Get OneClean Fan State: %s', this.accessory.displayName, currentState);
     return currentState;
   }

@@ -54,24 +54,19 @@ export class DaikinOnePlusAQSensor {
       });
     }
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    // push the new value to HomeKit
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, this.handleAirQualityGet());
-      if (this.forIndoor) {
-        this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
-      } else {
-        this.service.updateCharacteristic(this.platform.Characteristic.OzoneDensity, this.handleOzoneGet());
-      }
-      const aqValue = this.handleAirQualityValueGet();
-      this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.accessory.displayName} ${aqValue}`);
-
-      this.service.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.handlePM2_5DensityGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, this.handleAirQualityGet());
+    if (this.forIndoor) {
+      this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
+    } else {
+      this.service.updateCharacteristic(this.platform.Characteristic.OzoneDensity, this.handleOzoneGet());
     }
+    const aqValue = this.handleAirQualityValueGet();
+    this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.accessory.displayName} ${aqValue}`);
+    this.service.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.handlePM2_5DensityGet());
   }
 
   /**

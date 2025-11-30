@@ -107,55 +107,40 @@ export class DaikinOnePlusThermostat {
       })
       .onSet(this.handleTargetHumiditySet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    // push the new value to HomeKit
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      const targetHeatingCoolingState = this.handleThermostatModeGet();
-      const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
-      const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
+    const targetHeatingCoolingState = this.handleThermostatModeGet();
+    const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
+    const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
 
-      this.service.updateCharacteristic(
-        this.platform.Characteristic.CurrentHeatingCoolingState,
-        this.handleCurrentHeatingCoolingStateGet(),
-      );
-      this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, targetHeatingCoolingState);
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.handleCurrentHeatingCoolingStateGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, targetHeatingCoolingState);
 
-      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
-        this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
-          minValue: 10,
-          maxValue: 30,
-        });
-      }
-      if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
-        this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
-          minValue: 12,
-          maxValue: 32,
-        });
-      }
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleCurrentTemperatureGet());
-      this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.handleTargetTemperatureGet());
-
-      if (
-        targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
-        coolingThresholdTemperature !== undefined
-      ) {
-        this.service.updateCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature, coolingThresholdTemperature);
-      }
-      if (
-        targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO &&
-        heatingThresholdTemperature !== undefined
-      ) {
-        this.service.updateCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature, heatingThresholdTemperature);
-      }
-
-      this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
-      this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
+    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
+      this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
+        minValue: 10,
+        maxValue: 30,
+      });
     }
+    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
+      this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
+        minValue: 12,
+        maxValue: 32,
+      });
+    }
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleCurrentTemperatureGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.handleTargetTemperatureGet());
+
+    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO) {
+      this.service.updateCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature, coolingThresholdTemperature);
+      this.service.updateCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature, heatingThresholdTemperature);
+    }
+
+    this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
   }
 
   /**

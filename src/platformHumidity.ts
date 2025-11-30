@@ -38,14 +38,11 @@ export class DaikinOnePlusHumidity {
       return this.handleHumidityGet();
     });
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleHumidityGet());
-    }
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleHumidityGet());
   }
 
   /**

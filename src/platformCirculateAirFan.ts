@@ -49,25 +49,21 @@ export class DaikinOnePlusCirculateAirFan {
       })
       .onSet(this.handleSpeedSet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   updateValues() {
-    const value = this.handleActiveGet();
-    this.service.updateCharacteristic(this.platform.Characteristic.Active, value);
-    const speed = this.handleSpeedGet();
-    this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, speed);
+    this.service.updateCharacteristic(this.platform.Characteristic.Active, this.handleActiveGet());
+    this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.handleSpeedGet());
   }
 
   /**
    * Handle requests to get the current value of the "Active" characteristic
    */
   handleActiveGet() {
-    const currentState =
-      this.daikinApi.deviceHasData(this.deviceId) && this.daikinApi.getCirculateAirFanActive(this.deviceId)
-        ? this.platform.Characteristic.Active.ACTIVE
-        : this.platform.Characteristic.Active.INACTIVE;
+    const currentState = this.daikinApi.getCirculateAirFanActive(this.deviceId)
+      ? this.platform.Characteristic.Active.ACTIVE
+      : this.platform.Characteristic.Active.INACTIVE;
     this.platform.log.debug('%s - Get Circulate Air Fan State: %s', this.accessory.displayName, currentState);
     return currentState;
   }
@@ -85,23 +81,19 @@ export class DaikinOnePlusCirculateAirFan {
    */
   handleSpeedGet() {
     let currentSpeed = 0;
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      const currentState = this.daikinApi.getCirculateAirFanActive(this.deviceId);
+    const currentState = this.daikinApi.getCirculateAirFanActive(this.deviceId);
+    if (currentState) {
       const rawSpeed = this.daikinApi.getCirculateAirFanSpeed(this.deviceId);
-      if (currentState) {
-        switch (rawSpeed) {
-          case 1: //med
-            currentSpeed = 2;
-            break;
-          case 2: //high
-            currentSpeed = 3;
-            break;
-          default: //low
-            currentSpeed = 1;
-            break;
-        }
-      } else {
-        currentSpeed = 0;
+      switch (rawSpeed) {
+        case 1: //med
+          currentSpeed = 2;
+          break;
+        case 2: //high
+          currentSpeed = 3;
+          break;
+        default: //low
+          currentSpeed = 1;
+          break;
       }
     }
     this.platform.log.debug('%s - Get Circulate Air Fan Speed: %d', this.accessory.displayName, currentSpeed);
