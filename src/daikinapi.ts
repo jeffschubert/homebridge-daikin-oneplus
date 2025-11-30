@@ -119,9 +119,9 @@ export class DaikinApi {
           continue;
         }
         this._updateCache(device.id, data);
-        this.log.debug('Notifying all listeners');
-        this.notifyListeners();
       }
+      this.log.debug('Notifying all listeners');
+      this.notifyListeners();
     }
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
