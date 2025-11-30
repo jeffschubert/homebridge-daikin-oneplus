@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi, TargetHeatingCoolingState } from './daikinapi.js';
-
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
@@ -14,7 +14,7 @@ export class DaikinOnePlusEmergencyHeatSwitch {
 
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
   ) {
@@ -54,8 +54,7 @@ export class DaikinOnePlusEmergencyHeatSwitch {
    */
   handleCurrentStateGet(): boolean {
     const currentState =
-      this.daikinApi.deviceHasData(this.deviceId) &&
-      this.daikinApi.getTargetState(this.deviceId) === TargetHeatingCoolingState.AUXILIARY_HEAT;
+      this.daikinApi.deviceHasData(this.deviceId) && this.daikinApi.getTargetState(this.deviceId) === ThermostatMode.EMERGENCY_HEAT;
     this.platform.log.debug('%s - Get Emergency Heat State: %s', this.accessory.displayName, currentState);
     return currentState;
   }
@@ -65,6 +64,6 @@ export class DaikinOnePlusEmergencyHeatSwitch {
    */
   async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Emergency Heat State: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetState(this.deviceId, value ? TargetHeatingCoolingState.AUXILIARY_HEAT : TargetHeatingCoolingState.HEAT);
+    await this.daikinApi.setTargetState(this.deviceId, value ? ThermostatMode.EMERGENCY_HEAT : ThermostatMode.HEAT);
   }
 }

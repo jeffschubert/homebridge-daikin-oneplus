@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi, TargetHeatingCoolingState } from './daikinapi.js';
-
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
@@ -12,7 +12,7 @@ export class DaikinOnePlusThermostat {
 
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
   ) {
@@ -40,9 +40,9 @@ export class DaikinOnePlusThermostat {
       .getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
       .onGet(() => {
         this.daikinApi.updateNow();
-        return this.handleTargetHeatingCoolingStateGet();
+        return this.handleThermostatModeGet();
       })
-      .onSet(this.handleTargetHeatingCoolingStateSet.bind(this));
+      .onSet(this.handleThermostatModeSet.bind(this));
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature).onGet(() => {
       this.daikinApi.updateNow();
@@ -114,7 +114,7 @@ export class DaikinOnePlusThermostat {
   updateValues() {
     // push the new value to HomeKit
     if (this.daikinApi.deviceHasData(this.deviceId)) {
-      const targetHeatingCoolingState = this.handleTargetHeatingCoolingStateGet();
+      const targetHeatingCoolingState = this.handleThermostatModeGet();
       const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
       const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
 
@@ -181,34 +181,34 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
    */
-  handleTargetHeatingCoolingStateGet(): CharacteristicValue {
-    // set this to a valid value for TargetHeatingCoolingState
+  handleThermostatModeGet(): CharacteristicValue {
+    // set this to a valid value for ThermostatMode
     let currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
     const currentStatus = this.daikinApi.getTargetState(this.deviceId);
     // set this to a valid value for CurrentHeatingCoolingState
     switch (currentStatus) {
-      case TargetHeatingCoolingState.HEAT:
-      case TargetHeatingCoolingState.AUXILIARY_HEAT:
+      case ThermostatMode.HEAT:
+      case ThermostatMode.EMERGENCY_HEAT:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.HEAT;
         break;
-      case TargetHeatingCoolingState.COOL:
+      case ThermostatMode.COOL:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.COOL;
         break;
-      case TargetHeatingCoolingState.AUTO:
+      case ThermostatMode.AUTO:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.AUTO;
         break;
-      case TargetHeatingCoolingState.OFF:
+      case ThermostatMode.OFF:
         currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
         break;
       default:
         this.platform.log.debug(
-          '%s - Unable to get TargetHeatingCoolingState. Unknown state retrieved: %s',
+          '%s - Unable to get ThermostatMode. Unknown state retrieved: %s',
           this.accessory.displayName,
           currentStatus,
         );
         break;
     }
-    this.platform.log.debug('%s - Get TargetHeatingCoolingState: %d', this.accessory.displayName, currentValue);
+    this.platform.log.debug('%s - Get ThermostatMode: %d', this.accessory.displayName, currentValue);
     return currentValue;
   }
 
@@ -315,24 +315,24 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Target Heating Cooling State" characteristic
    */
-  async handleTargetHeatingCoolingStateSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set TargetHeatingCoolingState: %s', this.accessory.displayName, value);
+  async handleThermostatModeSet(value: CharacteristicValue) {
+    this.platform.log.debug('%s - Set ThermostatMode: %s', this.accessory.displayName, value);
 
-    // set this to a valid value for TargetHeatingCoolingState
-    let requestedState = TargetHeatingCoolingState.OFF;
+    // set this to a valid value for ThermostatMode
+    let requestedState = ThermostatMode.OFF;
     // set this to a valid value for CurrentHeatingCoolingState
     switch (value) {
       case this.platform.Characteristic.TargetHeatingCoolingState.HEAT:
-        requestedState = TargetHeatingCoolingState.HEAT;
+        requestedState = ThermostatMode.HEAT;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.COOL:
-        requestedState = TargetHeatingCoolingState.COOL;
+        requestedState = ThermostatMode.COOL;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.AUTO:
-        requestedState = TargetHeatingCoolingState.AUTO;
+        requestedState = ThermostatMode.AUTO;
         break;
       case this.platform.Characteristic.TargetHeatingCoolingState.OFF:
-        requestedState = TargetHeatingCoolingState.OFF;
+        requestedState = ThermostatMode.OFF;
         break;
     }
 

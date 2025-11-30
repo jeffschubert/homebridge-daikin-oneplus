@@ -10,8 +10,9 @@ import { DaikinApi } from './daikinapi.js';
 import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch.js';
 import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan.js';
 import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
-import { DaikinOptionsInterface } from './daikinconfig.js';
+import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions } from './types.js';
 import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
+import assert from 'node:assert';
 
 /**
  * HomebridgePlatform
@@ -20,16 +21,16 @@ import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js
  */
 export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   // this is used to track restored cached accessories
-  private readonly accessories: PlatformAccessory[];
+  private readonly accessories: PlatformAccessory<AccessoryContext>[];
   public readonly api: API;
-  public config!: DaikinOptionsInterface;
+  public config: DaikinOptions;
   public readonly log: Logging;
 
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
 
-  private readonly daikinApi!: DaikinApi;
-  private discoverTimer!: NodeJS.Timeout;
+  private readonly daikinApi: DaikinApi;
+  private discoverTimer: NodeJS.Timeout | undefined;
 
   constructor(log: Logging, config: PlatformConfig, api: API) {
     this.accessories = [];
@@ -41,33 +42,35 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     //Don't start if not configured
     if (!config) {
-      this.log.error('Not configured.');
-      return;
+      throw new Error('No configuration found.');
     }
-    this.config = {
-      debug: config.debug === true,
-      user: config.user as string,
-      password: config.password as string,
-      includeDeviceName: (config.includeDeviceName as boolean) ?? false,
-      name: config.name as string,
-      enableEmergencyHeatSwitch: 'enableEmergencyHeatSwitch' in config ? (config.enableEmergencyHeatSwitch as boolean) : false,
-      enableOneCleanFan: 'enableOneCleanFan' in config ? (config.enableOneCleanFan as boolean) : false,
-      enableCirculateAirFan: 'enableCirculateAirFan' in config ? (config.enableCirculateAirFan as boolean) : false,
-      enableScheduleSwitch: 'enableScheduleSwitch' in config ? (config.enableScheduleSwitch as boolean) : false,
-      enableAwaySwitch: 'enableAwaySwitch' in config ? (config.enableAwaySwitch as boolean) : false,
-      ignoreIndoorAqi: 'ignoreIndoorAqi' in config ? (config.ignoreIndoorAqi as boolean) : false,
-      ignoreOutdoorAqi: 'ignoreOutdoorAqi' in config ? (config.ignoreOutdoorAqi as boolean) : false,
-      ignoreIndoorHumSensor: 'ignoreIndoorHumSensor' in config ? (config.ignoreIndoorHumSensor as boolean) : false,
-      ignoreOutdoorHumSensor: 'ignoreOutdoorHumSensor' in config ? (config.ignoreOutdoorHumSensor as boolean) : false,
-      ignoreThermostat: 'ignoreThermostat' in config ? (config.ignoreThermostat as boolean) : false,
-      ignoreOutdoorTemp: 'ignoreOutdoorTemp' in config ? (config.ignoreOutdoorTemp as boolean) : false,
-      autoResumeSchedule: 'autoResumeSchedule' in config ? (config.autoResumeSchedule as boolean) : false,
-    };
 
-    if (!this.config.user || !this.config.password) {
-      this.log.error('No Daikin login credentials configured.');
-      return;
-    }
+    assert(
+      typeof config.user === 'string' && config.user.length > 0 && typeof config.password === 'string' && config.password.length > 0,
+      'No valid Daikin login credentials configured.',
+    );
+
+    assert(typeof config.name === 'string', 'No valid name configured.');
+
+    this.config = {
+      debug: !!config.debug,
+      user: config.user,
+      password: config.password,
+      name: config.name,
+      includeDeviceName: !!config.includeDeviceName,
+      enableEmergencyHeatSwitch: !!config.enableEmergencyHeatSwitch,
+      enableOneCleanFan: !!config.enableOneCleanFan,
+      enableCirculateAirFan: !!config.enableCirculateAirFan,
+      enableScheduleSwitch: !!config.enableScheduleSwitch,
+      enableAwaySwitch: !!config.enableAwaySwitch,
+      ignoreIndoorAqi: !!config.ignoreIndoorAqi,
+      ignoreOutdoorAqi: !!config.ignoreOutdoorAqi,
+      ignoreIndoorHumSensor: !!config.ignoreIndoorHumSensor,
+      ignoreOutdoorHumSensor: !!config.ignoreOutdoorHumSensor,
+      ignoreThermostat: !!config.ignoreThermostat,
+      ignoreOutdoorTemp: !!config.ignoreOutdoorTemp,
+      autoResumeSchedule: !!config.autoResumeSchedule,
+    };
 
     this.debug('Debug logging on. Expect lots of messages.');
 
@@ -113,7 +116,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
    * This function is invoked when homebridge restores cached accessories from disk at startup.
    * It should be used to setup event handlers for characteristics and update respective values.
    */
-  configureAccessory(accessory: PlatformAccessory) {
+  configureAccessory(accessory: PlatformAccessory<AccessoryContext>) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
 
     // add the restored accessory to the accessories cache so we can track if it has already been registered
@@ -137,7 +140,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.log.error('Unable to retrieve devices. Aborting discovery of devices.');
       return;
     }
-    const devices = this.daikinApi.getDeviceList() || [];
+    const devices = this.daikinApi.getDeviceList();
 
     // loop over the discovered devices and register each one if it has not already been registered
     for (const device of devices) {
@@ -158,8 +161,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverEmergencyHeatSwitch(device: any) {
+  private discoverEmergencyHeatSwitch(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_emergency_heat`);
     this.log.debug('Checking for Emergency Heat Switch...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -176,7 +178,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new emergency heat switch:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusEmergencyHeatSwitch(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -188,8 +190,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverOneCleanFan(device: any) {
+  private discoverOneCleanFan(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_one_clean_fan`);
     this.log.debug('Checking for One Clean Fan...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -206,7 +207,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new one clean fan:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusOneCleanFan(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -218,8 +219,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverCirculateAirFan(device: any) {
+  private discoverCirculateAirFan(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_circ_air_fan`);
     this.log.debug('Checking for Circulate Air Fan...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -236,7 +236,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new circulate air fan:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusCirculateAirFan(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -248,8 +248,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverScheduleSwitch(device: any) {
+  private discoverScheduleSwitch(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_schedule`);
     this.log.debug('Checking for Schedule Switch...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -266,7 +265,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new schedule switch:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusScheduleSwitch(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -278,8 +277,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverAwaySwitch(device: any) {
+  private discoverAwaySwitch(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_away`);
     this.log.debug('Checking for Away Switch...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -296,7 +294,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new away switch:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusAwaySwitch(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -308,8 +306,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverIndoorAqi(device: any, deviceData: any) {
+  private discoverIndoorAqi(device: Thermostat, deviceData: ThermostatData | undefined) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_iaqi`);
     this.log.debug('Checking for indoor Air Quality sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -327,7 +324,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           // the accessory does not yet exist, so we need to create it
           this.log.debug('Adding new indoor Air Quality sensor:', dName);
 
-          const accessory = new this.api.platformAccessory(dName, uuid);
+          const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
           accessory.context.device = device;
           new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, true);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -343,8 +340,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverOutdoorAqi(device: any, deviceData: any) {
+  private discoverOutdoorAqi(device: Thermostat, deviceData: ThermostatData | undefined) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_oaqi`);
     this.log.debug('Checking for outdoor Air Quality sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -362,7 +358,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           // the accessory does not yet exist, so we need to create it
           this.log.debug('Adding new outdoor Air Quality sensor:', dName);
 
-          const accessory = new this.api.platformAccessory(dName, uuid);
+          const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
           accessory.context.device = device;
           new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, false);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -378,8 +374,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverIndoorHumSensor(device: any) {
+  private discoverIndoorHumSensor(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_ihum`);
     this.log.debug('Checking for indoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -395,7 +390,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new indoor humidity sensor:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, true);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -407,8 +402,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverOutdoorHumSensor(device: any) {
+  private discoverOutdoorHumSensor(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_ohum`);
     this.log.debug('Checking for outdoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -425,7 +419,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new outdoor humidity sensor:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, false);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -437,8 +431,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverThermostat(device: any) {
+  private discoverThermostat(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_tstat`);
     this.log.debug('Checking for thermostat...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -454,7 +447,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new thermostat:', dName);
 
-        const accessory = new this.api.platformAccessory(dName, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusThermostat(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -465,8 +458,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private discoverOutdoorTemp(device: any) {
+  private discoverOutdoorTemp(device: Thermostat) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_otemp`);
     this.log.debug('checking for Outdoor Temperature...');
     const existingaccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -482,7 +474,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('adding new Outdoor Temperature:', dname);
 
-        const accessory = new this.api.platformAccessory(dname, uuid);
+        const accessory = new this.api.platformAccessory<AccessoryContext>(dname, uuid);
         accessory.context.device = device;
         new DaikinOnePlusOutdoorTemperature(this, accessory, device.id, this.daikinApi);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
@@ -493,8 +485,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private accessoryName(device: any, accessory: string) {
+  private accessoryName(device: Thermostat, accessory: string) {
     return this.config.includeDeviceName ? `${device.name} ${accessory}` : accessory;
   }
 

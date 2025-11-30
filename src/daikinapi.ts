@@ -1,14 +1,24 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { AxiosResponse } from 'axios';
 import { hrtime } from 'process';
 import { Logging } from 'homebridge';
+import {
+  AirQualityLevel,
+  Thermostat,
+  ThermostatData,
+  ThermostatUpdate,
+  EquipmentStatus,
+  FanCirculateMode,
+  TemperatureUnit,
+  ThermostatMode,
+} from './types.js';
 
-export declare const enum TargetHeatingCoolingState {
-  OFF = 0,
-  HEAT = 1,
-  COOL = 2,
-  AUTO = 3,
-  AUXILIARY_HEAT = 4,
+/**
+ * Token response from the Daikin authentication API.
+ */
+interface DaikinTokenResponse {
+  accessToken: string;
+  accessTokenExpiresIn: number;
+  refreshToken: string;
 }
 
 export type DataChanged = () => void;
@@ -24,9 +34,9 @@ export const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
 export const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
 
 export class DaikinApi {
-  private _token;
-  private _tokenExpiration;
-  private _devices: any[] | undefined; // cache of all devices (thermostats) and their state
+  private _token: DaikinTokenResponse | undefined;
+  private _tokenExpiration = new Date(0);
+  private _devices: Thermostat[] = []; // cache of all devices (thermostats) and their state
   private _isInitialized = false;
   private _listeners: Set<DataChanged> = new Set();
 
@@ -70,15 +80,15 @@ export class DaikinApi {
   async Initialize() {
     await this.getToken();
 
-    if (this._token === undefined || this._token === null) {
+    if (!this._token) {
       this.log.error('Unable to retrieve token.');
       return;
     }
 
     await this.getDevices();
 
-    if (this._devices !== undefined) {
-      this.log.debug('Found %s devices: ', this._devices.length);
+    if (this._devices.length > 0) {
+      this.log.debug('Found %d devices: ', this._devices.length);
       this._devices.forEach(element => {
         this.log.debug('Device: %s', element.name);
       });
@@ -111,18 +121,16 @@ export class DaikinApi {
       this._lastWriteFinishTimeMs,
     );
 
-    if (this._devices) {
-      for (const device of this._devices) {
-        const data = await this.getDeviceData(device.id);
-        if (!data) {
-          this.log.error('Unable to retrieve data for %s.', device.name);
-          continue;
-        }
-        this._updateCache(device.id, data);
+    for (const device of this._devices) {
+      const data = await this.getDeviceData(device.id);
+      if (!data) {
+        this.log.error('Unable to retrieve data for %s.', device.name);
+        continue;
       }
-      this.log.debug('Notifying all listeners');
-      this.notifyListeners();
+      this._updateCache(device.id, data);
     }
+    this.log.debug('Notifying all listeners');
+    this.notifyListeners();
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
     this.log.debug(
@@ -257,7 +265,7 @@ export class DaikinApi {
     }
   }
 
-  setToken(response: AxiosResponse<any>) {
+  setToken(response: AxiosResponse<DaikinTokenResponse>) {
     this._token = response.data;
     this._tokenExpiration = new Date();
 
@@ -270,12 +278,12 @@ export class DaikinApi {
 
   async getDevices() {
     const response = await this.getRequest('https://api.daikinskyport.com/devices');
-    this._devices = response;
+    this._devices = response ?? [];
     return this._devices;
   }
 
-  getDeviceData(device) {
-    return this.getRequest(`https://api.daikinskyport.com/deviceData/${device}`);
+  getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
+    return this.getRequest(`https://api.daikinskyport.com/deviceData/${deviceId}`);
   }
 
   async refreshToken() {
@@ -325,7 +333,7 @@ export class DaikinApi {
     }
   }
 
-  getDeviceList() {
+  getDeviceList(): Thermostat[] {
     return this._devices;
   }
 
@@ -351,124 +359,104 @@ export class DaikinApi {
   }
 
   deviceHasData(deviceId: string): boolean {
-    const device = this._cachedDeviceById(deviceId);
-    if (typeof device === 'undefined' || typeof device.data === 'undefined') {
-      return false;
-    }
-    return true;
+    return !!this._devices.find(e => e.id === deviceId);
   }
 
-  getCurrentStatus(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.equipmentStatus;
+  getCurrentStatus(deviceId: string): EquipmentStatus {
+    return this._cachedDeviceById(deviceId).data.equipmentStatus;
   }
 
   getCurrentTemp(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.tempIndoor;
+    return this._cachedDeviceById(deviceId).data.tempIndoor;
   }
 
   getOutdoorTemp(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.tempOutdoor;
+    return this._cachedDeviceById(deviceId).data.tempOutdoor;
   }
 
-  getTargetState(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.mode;
+  getTargetState(deviceId: string): ThermostatMode {
+    return this._cachedDeviceById(deviceId).data.mode;
   }
 
   getOneCleanFanActive(deviceId: string): boolean {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.oneCleanFanActive;
+    return this._cachedDeviceById(deviceId).data.oneCleanFanActive;
   }
 
   getCirculateAirFanActive(deviceId: string): boolean {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.fanCirculate === 0 ? false : true;
+    return this._cachedDeviceById(deviceId).data.fanCirculate !== FanCirculateMode.OFF;
   }
 
   getCirculateAirFanSpeed(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.fanCirculateSpeed;
+    return this._cachedDeviceById(deviceId).data.fanCirculateSpeed;
   }
 
   getTargetTemp(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    switch (device.data.mode) {
-      case TargetHeatingCoolingState.HEAT:
-      case TargetHeatingCoolingState.AUXILIARY_HEAT:
-      case TargetHeatingCoolingState.AUTO:
-        return device.data.hspActive;
-      case TargetHeatingCoolingState.COOL:
+    const data = this._cachedDeviceById(deviceId).data;
+    switch (data.mode) {
+      case ThermostatMode.HEAT:
+      case ThermostatMode.EMERGENCY_HEAT:
+      case ThermostatMode.AUTO:
+        return data.hspActive;
+      case ThermostatMode.COOL:
       default:
-        return device.data.cspActive;
+        return data.cspActive;
     }
   }
 
   heatingThresholdTemperature(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.hspActive;
+    return this._cachedDeviceById(deviceId).data.hspActive;
   }
 
   coolingThresholdTemperature(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.cspActive;
+    return this._cachedDeviceById(deviceId).data.cspActive;
   }
 
   getCurrentHumidity(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.humIndoor;
+    return this._cachedDeviceById(deviceId).data.humIndoor;
   }
 
   getOutdoorHumidity(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.humOutdoor;
+    return this._cachedDeviceById(deviceId).data.humOutdoor;
   }
 
   getTargetHumidity(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.humSP;
+    return this._cachedDeviceById(deviceId).data.humSP;
   }
 
-  getAirQualityLevel(deviceId: string, forIndoor: boolean): number {
-    const device = this._cachedDeviceById(deviceId);
-    return forIndoor ? device.data.aqIndoorLevel : device.data.aqOutdoorLevel;
+  getAirQualityLevel(deviceId: string, forIndoor: boolean): AirQualityLevel {
+    const data = this._cachedDeviceById(deviceId).data;
+    return forIndoor ? data.aqIndoorLevel : data.aqOutdoorLevel;
   }
 
   getOzone(deviceId: string, forIndoor: boolean): number {
-    const device = this._cachedDeviceById(deviceId);
-    return forIndoor ? 0 : device.data.aqOutdoorOzone;
+    return forIndoor ? 0 : this._cachedDeviceById(deviceId).data.aqOutdoorOzone;
   }
 
   getAirQualityValue(deviceId: string, forIndoor: boolean): number {
-    const device = this._cachedDeviceById(deviceId);
-    return forIndoor ? device.data.aqIndoorValue : device.data.aqOutdoorValue;
+    const data = this._cachedDeviceById(deviceId).data;
+    return forIndoor ? data.aqIndoorValue : data.aqOutdoorValue;
   }
 
   getPM2_5Density(deviceId: string, forIndoor: boolean): number {
-    const device = this._cachedDeviceById(deviceId);
-    return forIndoor ? device.data.aqIndoorParticlesValue : device.data.aqOutdoorParticles;
+    const data = this._cachedDeviceById(deviceId).data;
+    return forIndoor ? data.aqIndoorParticlesValue : data.aqOutdoorParticles;
   }
 
   getVocDensity(deviceId: string, forIndoor: boolean): number {
-    const device = this._cachedDeviceById(deviceId);
-    return forIndoor ? device.data.aqIndoorVOCValue : 0;
+    return forIndoor ? this._cachedDeviceById(deviceId).data.aqIndoorVOCValue : 0;
   }
 
-  getDisplayUnits(deviceId: string): number {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.units;
+  getDisplayUnits(deviceId: string): TemperatureUnit {
+    return this._cachedDeviceById(deviceId).data.units;
   }
 
   getScheduleState(deviceId: string): boolean {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.schedOverride === 0 && device.data.schedEnabled && !device.data.geofencingAway;
+    const data = this._cachedDeviceById(deviceId).data;
+    return data.schedOverride === 0 && data.schedEnabled && !data.geofencingAway;
   }
 
   getAwayState(deviceId: string): boolean {
-    const device = this._cachedDeviceById(deviceId);
-    return device.data.geofencingAway;
+    return this._cachedDeviceById(deviceId).data.geofencingAway;
   }
 
   async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean> {
@@ -478,11 +466,11 @@ export class DaikinApi {
       return false;
     }
 
-    let requestedData;
+    let requestedData: ThermostatUpdate;
     // Only send the request if the request provides a value pertinent to the current state/mode.
     switch (deviceData.mode) {
-      case TargetHeatingCoolingState.HEAT:
-      case TargetHeatingCoolingState.AUXILIARY_HEAT:
+      case ThermostatMode.HEAT:
+      case ThermostatMode.EMERGENCY_HEAT:
         if (!targetTemp) {
           return true;
         }
@@ -491,7 +479,7 @@ export class DaikinApi {
           hspHome: targetTemp,
         };
         break;
-      case TargetHeatingCoolingState.COOL:
+      case ThermostatMode.COOL:
         if (!targetTemp) {
           return true;
         }
@@ -500,10 +488,10 @@ export class DaikinApi {
           cspHome: targetTemp,
         };
         break;
-      case TargetHeatingCoolingState.OFF:
+      case ThermostatMode.OFF:
         // Do nothing when off
         return true;
-      case TargetHeatingCoolingState.AUTO:
+      case ThermostatMode.AUTO:
         //Disregard setting Target Temp when in auto/off
         if (targetTemp) {
           return true;
@@ -538,7 +526,7 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setTargetTemps', 'Error updating target temp:');
   }
 
-  async setTargetState(deviceId: string, requestedState: number): Promise<boolean> {
+  async setTargetState(deviceId: string, requestedState: ThermostatMode): Promise<boolean> {
     const requestedData = {
       mode: requestedState,
     };
@@ -574,7 +562,7 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setCirculateAirFanSpeed', 'Error updating Circulate Air fan and speed:');
   }
 
-  async setDisplayUnits(deviceId: string, requestedUnits: number): Promise<boolean> {
+  async setDisplayUnits(deviceId: string, requestedUnits: TemperatureUnit): Promise<boolean> {
     const requestedData = {
       units: requestedUnits,
     };
@@ -632,7 +620,7 @@ export class DaikinApi {
   //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for it)
   //TODO: reset timer on every device's request. once there's a full second without a request, then send?
   //TODO: always update cache data with requested so that local stays current with what will be state once written.
-  private async putRequest(deviceId: string, requestData: any, caller: string, errorHeader: string): Promise<boolean> {
+  private async putRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
     this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
     this._lastWriteFinishTimeMs = -1;
@@ -643,6 +631,11 @@ export class DaikinApi {
       this._lastReadStartTimeMs,
       this._lastReadFinishTimeMs,
     );
+
+    if (!this._token) {
+      this.log.error('No token for write request: %s', deviceId);
+      return false;
+    }
 
     try {
       const res = await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, requestData, {
@@ -671,10 +664,10 @@ export class DaikinApi {
     }
   }
 
-  private _updateCache(deviceId: string, partialUpdate: any) {
-    const cachedDevice = this._cachedDeviceById(deviceId);
+  private _updateCache(deviceId: string, partialUpdate: ThermostatUpdate) {
+    const cachedDevice = this._devices.find(e => e.id === deviceId);
     if (cachedDevice) {
-      const updatedData = {
+      const updatedData: ThermostatData = {
         ...cachedDevice.data,
         ...partialUpdate,
       };
@@ -686,29 +679,29 @@ export class DaikinApi {
     }
   }
 
-  private _cachedDeviceById(deviceId: string) {
-    if (!this._devices) {
-      return undefined;
+  private _cachedDeviceById(deviceId: string): Thermostat {
+    const device = this._devices.find(e => e.id === deviceId);
+    if (!device) {
+      throw new Error(`No cached data for device ${deviceId}`);
     }
-    return this._devices.find(e => e.id === deviceId);
+    return device;
   }
 
-  logError(message: string, error): boolean {
+  logError(message: string, error: unknown): boolean {
     this.log.error(message);
-    if (error.response) {
+    // Handle axios errors which have response/request properties
+    const axiosError = error as { response?: { data: unknown; status: number; headers: unknown }; request?: unknown; message?: string };
+    if (axiosError.response) {
       // When response status code is out of 2xx range
-      this.log.error('Error with response:');
-      this.log.error(error.response.data);
-      this.log.error(error.response.status);
-      this.log.error(error.response.headers);
-    } else if (error.request) {
+      this.log.error('Response status: %d', axiosError.response.status);
+      this.log.error('Response data: %s', JSON.stringify(axiosError.response.data));
+      this.log.error('Response headers: %s', JSON.stringify(axiosError.response.headers));
+    } else if (axiosError.request) {
       // When no response was received after request was made
-      this.log.error('Error with request:');
-      this.log.error(error.request);
+      this.log.error('No response received for request');
     } else {
       // Error
-      this.log.error('General error:');
-      this.log.error(error.message);
+      this.log.error(axiosError.message ?? String(error));
     }
     return false;
   }

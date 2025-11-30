@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
-
+import { AccessoryContext } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
@@ -14,7 +14,7 @@ export class DaikinOnePlusCirculateAirFan {
 
   constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
   ) {
