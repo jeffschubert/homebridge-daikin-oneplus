@@ -466,7 +466,11 @@ export class DaikinApi {
       return false;
     }
 
-    let requestedData: ThermostatUpdate;
+    // apiData: fields to send to API (only writable fields)
+    // cacheUpdate: fields to update in local cache (includes read-only derived fields for immediate UI feedback)
+    let apiData: ThermostatUpdate;
+    let cacheUpdate: ThermostatUpdate;
+
     // Only send the request if the request provides a value pertinent to the current state/mode.
     switch (deviceData.mode) {
       case ThermostatMode.HEAT:
@@ -475,18 +479,16 @@ export class DaikinApi {
           return true;
         }
 
-        requestedData = {
-          hspHome: targetTemp,
-        };
+        apiData = { hspHome: targetTemp };
+        cacheUpdate = { hspHome: targetTemp, hspActive: targetTemp };
         break;
       case ThermostatMode.COOL:
         if (!targetTemp) {
           return true;
         }
 
-        requestedData = {
-          cspHome: targetTemp,
-        };
+        apiData = { cspHome: targetTemp };
+        cacheUpdate = { cspHome: targetTemp, cspActive: targetTemp };
         break;
       case ThermostatMode.OFF:
         // Do nothing when off
@@ -507,9 +509,15 @@ export class DaikinApi {
           return true;
         }
 
-        requestedData = {
+        apiData = {
           hspHome: this.pendingHeatThreshold,
           cspHome: this.pendingCoolThreshold,
+        };
+        cacheUpdate = {
+          hspHome: this.pendingHeatThreshold,
+          hspActive: this.pendingHeatThreshold,
+          cspHome: this.pendingCoolThreshold,
+          cspActive: this.pendingCoolThreshold,
         };
         // Reset pending thresholds
         this.pendingCoolThreshold = undefined;
@@ -521,15 +529,24 @@ export class DaikinApi {
     }
 
     if (deviceData.schedEnabled) {
-      requestedData.schedOverride = 1;
+      apiData.schedOverride = 1;
+      cacheUpdate.schedOverride = 1;
     }
-    return this.putRequest(deviceId, requestedData, 'setTargetTemps', 'Error updating target temp:');
+
+    const success = await this.putRequest(deviceId, apiData, 'setTargetTemps', 'Error updating target temp:');
+    if (success) {
+      // Update cache with both API fields and derived fields for immediate UI feedback
+      this._updateCache(deviceId, cacheUpdate);
+    }
+    return success;
   }
 
   async setTargetState(deviceId: string, requestedState: ThermostatMode): Promise<boolean> {
     const requestedData = {
       mode: requestedState,
     };
+    // Update cache immediately so subsequent commands (e.g., setTargetTemps from a scene) see the new mode
+    this._updateCache(deviceId, { mode: requestedState });
     return this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
   }
 
