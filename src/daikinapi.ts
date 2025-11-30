@@ -54,8 +54,9 @@ export class DaikinApi {
   private password: string;
   private log: Logging;
 
-  private pendingCoolThreshold?: number;
-  private pendingHeatThreshold?: number;
+  // Pending thresholds per device for AUTO mode. HomeKit sends heat and cool thresholds
+  // separately, but the Daikin API requires both in a single request.
+  private _pendingThresholds: Map<string, { heat?: number; cool?: number }> = new Map();
 
   // Track emergency heat switch state per device. When the switch is ON, thermostat
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
@@ -501,36 +502,47 @@ export class DaikinApi {
       case ThermostatMode.OFF:
         // Do nothing when off
         return true;
-      case ThermostatMode.AUTO:
-        //Disregard setting Target Temp when in auto/off
+      case ThermostatMode.AUTO: {
+        // Disregard setting Target Temp when in auto/off
         if (targetTemp) {
           return true;
         }
-        if (coolThreshold) {
-          // Setting cool threshold for auto
-          this.pendingCoolThreshold = coolThreshold;
-        } else {
-          // Setting heat threshold for auto
-          this.pendingHeatThreshold = heatThreshold;
+
+        // Get or create pending thresholds for this device
+        let pending = this._pendingThresholds.get(deviceId);
+        if (!pending) {
+          pending = {};
+          this._pendingThresholds.set(deviceId, pending);
         }
-        if (!this.pendingHeatThreshold || !this.pendingCoolThreshold) {
+
+        // Accumulate thresholds - HomeKit sends them separately
+        if (coolThreshold !== undefined) {
+          pending.cool = coolThreshold;
+        }
+        if (heatThreshold !== undefined) {
+          pending.heat = heatThreshold;
+        }
+
+        // Wait until we have both thresholds before sending to API
+        if (pending.heat === undefined || pending.cool === undefined) {
           return true;
         }
 
         apiData = {
-          hspHome: this.pendingHeatThreshold,
-          cspHome: this.pendingCoolThreshold,
+          hspHome: pending.heat,
+          cspHome: pending.cool,
         };
         cacheUpdate = {
-          hspHome: this.pendingHeatThreshold,
-          hspActive: this.pendingHeatThreshold,
-          cspHome: this.pendingCoolThreshold,
-          cspActive: this.pendingCoolThreshold,
+          hspHome: pending.heat,
+          hspActive: pending.heat,
+          cspHome: pending.cool,
+          cspActive: pending.cool,
         };
-        // Reset pending thresholds
-        this.pendingCoolThreshold = undefined;
-        this.pendingHeatThreshold = undefined;
+
+        // Reset pending thresholds for this device
+        this._pendingThresholds.delete(deviceId);
         break;
+      }
       default:
         this.log.info('Device is in an unknown state: %s. Unable to set target temp. (%s)', deviceData.mode, deviceId);
         return false;
