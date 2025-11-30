@@ -21,17 +21,17 @@ interface DaikinTokenResponse {
   refreshToken: string;
 }
 
-export type DataChanged = () => void;
+type DataChanged = () => void;
 
 // After sending an update to the Daikin API it will return old data for up to 15 seconds, so we
 // delay fetching data after an update by this amount. https://daikinone.com/openapi/documentation/
-export const DAIKIN_DEVICE_WRITE_DELAY_MS = 15 * 1000;
+const DAIKIN_DEVICE_WRITE_DELAY_MS = 15 * 1000;
 
 // User is not interacting with a HomeKit controller - background updates for automations
-export const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
+const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
 
 // User is interacting with a HomeKit controller - latest data needed
-export const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
+const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
 
 export class DaikinApi {
   private _token: DaikinTokenResponse | undefined;
@@ -62,7 +62,7 @@ export class DaikinApi {
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
   private _emergencyHeatEnabled: Map<string, boolean> = new Map();
 
-  constructor(user: string, password: string, log: Logging) {
+  public constructor(user: string, password: string, log: Logging) {
     this.log = log;
     this.user = user;
     this.password = password;
@@ -95,7 +95,7 @@ export class DaikinApi {
     }
   }
 
-  async Initialize() {
+  public async Initialize() {
     await this.getToken();
 
     if (!this._token) {
@@ -120,14 +120,14 @@ export class DaikinApi {
     this._isInitialized = true;
   }
 
-  isInitialized(): boolean {
+  public isInitialized(): boolean {
     return this._isInitialized;
   }
 
   //TODO: if writing data or timer exists to write data, don't send get request
   //TODO: if data received while writing or waiting to write, toss
   //TODO: if above is done, then gets after, but within write delay time will get delayed.
-  async getData() {
+  private async getData() {
     this.log.debug('Getting data...');
     this._lastReadStartTimeMs = this._monotonic_clock_ms();
     this._lastReadFinishTimeMs = -1;
@@ -163,7 +163,7 @@ export class DaikinApi {
     this._scheduleUpdate();
   }
 
-  updateNow() {
+  public updateNow() {
     this._scheduleUpdate(undefined, true);
   }
 
@@ -178,7 +178,7 @@ export class DaikinApi {
    * @param blockUntilMs If given and > 0 then no updates are guaranteed to take place in the next `blockUntilMs` milliseconds.
    * @param asap perform update as soon as allowed by DAIKIN_DEVICE_FOREGROUND_REFRESH_MS
    */
-  _scheduleUpdate(blockUntilMs?: number, asap = false) {
+  private _scheduleUpdate(blockUntilMs?: number, asap = false) {
     if (asap) {
       this._scheduleAsap(blockUntilMs);
     } else {
@@ -261,7 +261,7 @@ export class DaikinApi {
     return Number(hrtime.bigint() / BigInt(1000000));
   }
 
-  async getToken() {
+  private async getToken() {
     this.log.debug('Getting token...');
     try {
       const response = await axios.post(
@@ -283,7 +283,7 @@ export class DaikinApi {
     }
   }
 
-  setToken(response: AxiosResponse<DaikinTokenResponse>) {
+  private setToken(response: AxiosResponse<DaikinTokenResponse>) {
     this._token = response.data;
     this._tokenExpiration = new Date();
 
@@ -294,17 +294,17 @@ export class DaikinApi {
     this._tokenExpiration.setSeconds(expSeconds);
   }
 
-  async getDevices() {
+  private async getDevices() {
     const response: Thermostat[] = (await this.getRequest('https://api.daikinskyport.com/devices')) ?? [];
     this._devices = new Map(response.map(d => [d.id, d]));
     return this._devices;
   }
 
-  async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
+  public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
     return await this.getRequest(`https://api.daikinskyport.com/deviceData/${deviceId}`);
   }
 
-  async refreshToken() {
+  private async refreshToken() {
     if (typeof this._token === 'undefined' || typeof this._token.refreshToken === 'undefined' || !this._token.refreshToken) {
       this.log.debug('Cannot refresh token. Getting new token.');
       return this.getToken();
@@ -329,7 +329,7 @@ export class DaikinApi {
     }
   }
 
-  async getRequest(uri: string) {
+  private async getRequest(uri: string) {
     if (new Date() >= this._tokenExpiration) {
       await this.refreshToken();
     }
@@ -351,61 +351,40 @@ export class DaikinApi {
     }
   }
 
-  getDeviceList(): Thermostat[] {
+  public getDeviceList(): Thermostat[] {
     return [...this._devices.values()];
   }
 
-  getDeviceName(deviceName: number, deviceNameCustom: string): string {
-    switch (deviceName) {
-      case 0:
-        return deviceNameCustom;
-      case 1:
-        return 'main room';
-      case 2:
-        return 'upstairs';
-      case 3:
-        return 'downstairs';
-      case 4:
-        return 'hallway';
-      case 5:
-        return 'bedroom';
-      case 6:
-        return 'kitchen';
-      default:
-        return 'other';
-    }
-  }
-
-  getCurrentStatus(deviceId: string): EquipmentStatus {
+  public getCurrentStatus(deviceId: string): EquipmentStatus {
     return this._devices.get(deviceId)?.data?.equipmentStatus ?? EquipmentStatus.IDLE;
   }
 
-  getCurrentTemp(deviceId: string): number {
+  public getCurrentTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempIndoor ?? -270;
   }
 
-  getOutdoorTemp(deviceId: string): number {
+  public getOutdoorTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempOutdoor ?? -270;
   }
 
-  getTargetState(deviceId: string): ThermostatMode {
+  public getTargetState(deviceId: string): ThermostatMode {
     return this._devices.get(deviceId)?.data?.mode ?? ThermostatMode.OFF;
   }
 
-  getOneCleanFanActive(deviceId: string): boolean {
+  public getOneCleanFanActive(deviceId: string): boolean {
     return this._devices.get(deviceId)?.data?.oneCleanFanActive ?? false;
   }
 
-  getCirculateAirFanActive(deviceId: string): boolean {
+  public getCirculateAirFanActive(deviceId: string): boolean {
     const fanCirculate = this._devices.get(deviceId)?.data?.fanCirculate;
     return fanCirculate !== undefined && fanCirculate !== FanCirculateMode.OFF;
   }
 
-  getCirculateAirFanSpeed(deviceId: string): number {
+  public getCirculateAirFanSpeed(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.fanCirculateSpeed ?? 0;
   }
 
-  getTargetTemp(deviceId: string): number {
+  public getTargetTemp(deviceId: string): number {
     const data = this._devices.get(deviceId)?.data;
     if (!data) return -270;
     switch (data.mode) {
@@ -419,77 +398,77 @@ export class DaikinApi {
     }
   }
 
-  heatingThresholdTemperature(deviceId: string): number {
+  public heatingThresholdTemperature(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.hspActive ?? -270;
   }
 
-  coolingThresholdTemperature(deviceId: string): number {
+  public coolingThresholdTemperature(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.cspActive ?? -270;
   }
 
-  getCurrentHumidity(deviceId: string): number {
+  public getCurrentHumidity(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.humIndoor ?? 0;
   }
 
-  getOutdoorHumidity(deviceId: string): number {
+  public getOutdoorHumidity(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.humOutdoor ?? 0;
   }
 
-  getTargetHumidity(deviceId: string): number {
+  public getTargetHumidity(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.humSP ?? 0;
   }
 
-  getAirQualityLevel(deviceId: string, forIndoor: boolean): AirQualityLevel {
+  public getAirQualityLevel(deviceId: string, forIndoor: boolean): AirQualityLevel {
     const data = this._devices.get(deviceId)?.data;
     if (!data) return AirQualityLevel.GOOD;
     return forIndoor ? data.aqIndoorLevel : data.aqOutdoorLevel;
   }
 
-  getOzone(deviceId: string, forIndoor: boolean): number {
+  public getOzone(deviceId: string, forIndoor: boolean): number {
     if (forIndoor) return 0;
     return this._devices.get(deviceId)?.data?.aqOutdoorOzone ?? 0;
   }
 
-  getAirQualityValue(deviceId: string, forIndoor: boolean): number {
+  public getAirQualityValue(deviceId: string, forIndoor: boolean): number {
     const data = this._devices.get(deviceId)?.data;
     if (!data) return 0;
     return forIndoor ? data.aqIndoorValue : data.aqOutdoorValue;
   }
 
-  getPM2_5Density(deviceId: string, forIndoor: boolean): number {
+  public getPM2_5Density(deviceId: string, forIndoor: boolean): number {
     const data = this._devices.get(deviceId)?.data;
     if (!data) return 0;
     return forIndoor ? data.aqIndoorParticlesValue : data.aqOutdoorParticles;
   }
 
-  getVocDensity(deviceId: string, forIndoor: boolean): number {
+  public getVocDensity(deviceId: string, forIndoor: boolean): number {
     if (!forIndoor) return 0;
     return this._devices.get(deviceId)?.data?.aqIndoorVOCValue ?? 0;
   }
 
-  getDisplayUnits(deviceId: string): TemperatureUnit {
+  public getDisplayUnits(deviceId: string): TemperatureUnit {
     return this._devices.get(deviceId)?.data?.units ?? TemperatureUnit.FAHRENHEIT;
   }
 
-  getScheduleState(deviceId: string): boolean {
+  public getScheduleState(deviceId: string): boolean {
     const data = this._devices.get(deviceId)?.data;
     if (!data) return false;
     return data.schedOverride === 0 && data.schedEnabled && !data.geofencingAway;
   }
 
-  getAwayState(deviceId: string): boolean {
+  public getAwayState(deviceId: string): boolean {
     return this._devices.get(deviceId)?.data?.geofencingAway ?? false;
   }
 
-  setEmergencyHeatEnabled(deviceId: string, enabled: boolean): void {
+  public setEmergencyHeatEnabled(deviceId: string, enabled: boolean): void {
     this._emergencyHeatEnabled.set(deviceId, enabled);
   }
 
-  isEmergencyHeatEnabled(deviceId: string): boolean {
+  public isEmergencyHeatEnabled(deviceId: string): boolean {
     return this._emergencyHeatEnabled.get(deviceId) ?? false;
   }
 
-  async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean> {
+  public async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean> {
     const deviceData = this._devices.get(deviceId)?.data;
     if (!deviceData) {
       this.log.error('Cannot set target temps - no data for device:', deviceId);
@@ -582,7 +561,7 @@ export class DaikinApi {
     return success;
   }
 
-  async setTargetState(deviceId: string, requestedState: ThermostatMode): Promise<boolean> {
+  public async setTargetState(deviceId: string, requestedState: ThermostatMode): Promise<boolean> {
     const requestedData = {
       mode: requestedState,
     };
@@ -591,21 +570,21 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
   }
 
-  async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {
+  public async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {
     const requestedData = {
       oneCleanFanActive: requestedState,
     };
     return this.putRequest(deviceId, requestedData, 'setOneCleanFanActive', 'Error updating OneClean fan:');
   }
 
-  async setCirculateAirFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {
+  public async setCirculateAirFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {
     const requestedData = {
       fanCirculate: requestedState ? 1 : 0,
     };
     return this.putRequest(deviceId, requestedData, 'setCirculateAirFanActive', 'Error updating Circulate Air fan:');
   }
 
-  async setCirculateAirFanSpeed(deviceId: string, requestedSpeed: number): Promise<boolean> {
+  public async setCirculateAirFanSpeed(deviceId: string, requestedSpeed: number): Promise<boolean> {
     let requestedData;
     if (requestedSpeed === -1) {
       requestedData = {
@@ -620,21 +599,21 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setCirculateAirFanSpeed', 'Error updating Circulate Air fan and speed:');
   }
 
-  async setDisplayUnits(deviceId: string, requestedUnits: TemperatureUnit): Promise<boolean> {
+  public async setDisplayUnits(deviceId: string, requestedUnits: TemperatureUnit): Promise<boolean> {
     const requestedData = {
       units: requestedUnits,
     };
     return this.putRequest(deviceId, requestedData, 'setDisplayUnits', 'Error updating display units:');
   }
 
-  async setTargetHumidity(deviceId: string, requestedHumidity: number): Promise<boolean> {
+  public async setTargetHumidity(deviceId: string, requestedHumidity: number): Promise<boolean> {
     const requestedData = {
       humSP: requestedHumidity,
     };
     return this.putRequest(deviceId, requestedData, 'setTargetHumidity', 'Error updating target humidity:');
   }
 
-  async setScheduleState(deviceId: string, requestedState: boolean): Promise<boolean> {
+  public async setScheduleState(deviceId: string, requestedState: boolean): Promise<boolean> {
     let requestedData;
     //  when enabling the schedule state, a schedule must exist.
     if (requestedState) {
@@ -652,7 +631,7 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setScheduleState', 'Error updating schedule state:');
   }
 
-  async setAwayState(deviceId: string, requestedState: boolean, enableSchedule: boolean): Promise<boolean> {
+  public async setAwayState(deviceId: string, requestedState: boolean, enableSchedule: boolean): Promise<boolean> {
     let requestedData;
     if (requestedState) {
       //  when enabling the away state, the schedule (if it exists) is automatically paused.
@@ -735,7 +714,7 @@ export class DaikinApi {
     this.log.debug('Updated cache for %s', deviceId);
   }
 
-  logError(message: string, error: unknown): boolean {
+  private logError(message: string, error: unknown): boolean {
     this.log.error(message);
     // Handle axios errors which have response/request properties
     const axiosError = error as { response?: { data: unknown; status: number; headers: unknown }; request?: unknown; message?: string };

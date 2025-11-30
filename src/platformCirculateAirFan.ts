@@ -10,9 +10,8 @@ import { DaikinOnePlusPlatform } from './platform.js';
  */
 export class DaikinOnePlusCirculateAirFan {
   private service: Service;
-  CurrentState!: CharacteristicValue;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -52,7 +51,7 @@ export class DaikinOnePlusCirculateAirFan {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.Active, this.handleActiveGet());
     this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.handleSpeedGet());
   }
@@ -60,7 +59,7 @@ export class DaikinOnePlusCirculateAirFan {
   /**
    * Handle requests to get the current value of the "Active" characteristic
    */
-  handleActiveGet() {
+  private handleActiveGet() {
     const currentState = this.daikinApi.getCirculateAirFanActive(this.deviceId)
       ? this.platform.Characteristic.Active.ACTIVE
       : this.platform.Characteristic.Active.INACTIVE;
@@ -71,7 +70,7 @@ export class DaikinOnePlusCirculateAirFan {
   /**
    * Handle requests to set the "Active" characteristic
    */
-  async handleActiveSet(value: CharacteristicValue) {
+  private async handleActiveSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Circulate Air Fan State: %s', this.accessory.displayName, value);
     await this.daikinApi.setCirculateAirFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
   }
@@ -79,7 +78,7 @@ export class DaikinOnePlusCirculateAirFan {
   /**
    * Handle requests to get the current value of the "Rotation Speed" characteristic
    */
-  handleSpeedGet() {
+  private handleSpeedGet() {
     let currentSpeed = 0;
     const currentState = this.daikinApi.getCirculateAirFanActive(this.deviceId);
     if (currentState) {
@@ -103,7 +102,7 @@ export class DaikinOnePlusCirculateAirFan {
   /**
    * Handle requests to set the "Rotation Speed" characteristic
    */
-  async handleSpeedSet(value: CharacteristicValue) {
+  private async handleSpeedSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Circulate Air Fan Speed: %s', this.accessory.displayName, value);
     const newSpeed = Number(value) - 1;
     await this.daikinApi.setCirculateAirFanSpeed(this.deviceId, newSpeed);

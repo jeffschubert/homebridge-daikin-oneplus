@@ -9,9 +9,8 @@ import { DaikinOnePlusPlatform } from './platform.js';
  */
 export class DaikinOnePlusOneCleanFan {
   private service: Service;
-  CurrentState!: CharacteristicValue;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -42,14 +41,14 @@ export class DaikinOnePlusOneCleanFan {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.Active, this.handleActiveGet());
   }
 
   /**
    * Handle requests to get the current value of the "Active" characteristic
    */
-  handleActiveGet() {
+  private handleActiveGet() {
     const currentState = this.daikinApi.getOneCleanFanActive(this.deviceId)
       ? this.platform.Characteristic.Active.ACTIVE
       : this.platform.Characteristic.Active.INACTIVE;
@@ -60,7 +59,7 @@ export class DaikinOnePlusOneCleanFan {
   /**
    * Handle requests to set the "Active" characteristic
    */
-  async handleActiveSet(value: CharacteristicValue) {
+  private async handleActiveSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set OneClean Fan State: %s', this.accessory.displayName, value);
     await this.daikinApi.setOneCleanFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
   }

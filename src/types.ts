@@ -53,7 +53,7 @@ export const enum AirQualityLevel {
  * Basic device information returned from the /devices endpoint.
  * Contains static device metadata that doesn't change during runtime.
  */
-export interface ThermostatInfo {
+interface ThermostatInfo {
   /** Unique device identifier (UUID format) */
   id: string;
   /** User-assigned device name */

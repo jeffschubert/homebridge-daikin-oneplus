@@ -6,7 +6,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
 export class DaikinOnePlusOutdoorTemperature {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -33,11 +33,11 @@ export class DaikinOnePlusOutdoorTemperature {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleTemperatureGet());
   }
 
-  handleTemperatureGet(): CharacteristicValue {
+  private handleTemperatureGet(): CharacteristicValue {
     const currentOutdoorTemp = this.daikinApi.getOutdoorTemp(this.deviceId);
     this.platform.log.debug('%s - Get Outdoor Temperature: %d', this.accessory.displayName, currentOutdoorTemp);
     return currentOutdoorTemp;

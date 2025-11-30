@@ -11,7 +11,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
 export class DaikinOnePlusAwaySwitch {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -42,21 +42,21 @@ export class DaikinOnePlusAwaySwitch {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.On, this.handleCurrentStateGet());
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
-  handleCurrentStateGet(): boolean {
+  private handleCurrentStateGet(): boolean {
     return this.daikinApi.getAwayState(this.deviceId);
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
-  async handleCurrentStateSet(value: CharacteristicValue) {
+  private async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Away State: %s', this.accessory.displayName, value);
     await this.daikinApi.setAwayState(this.deviceId, Boolean(value), this.platform.config.autoResumeSchedule);
   }

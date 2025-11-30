@@ -11,7 +11,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
 export class DaikinOnePlusScheduleSwitch {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -42,21 +42,21 @@ export class DaikinOnePlusScheduleSwitch {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.On, this.handleCurrentStateGet());
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
-  handleCurrentStateGet(): boolean {
+  private handleCurrentStateGet(): boolean {
     return this.daikinApi.getScheduleState(this.deviceId);
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
-  async handleCurrentStateSet(value: CharacteristicValue) {
+  private async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Schedule State: %s', this.accessory.displayName, value);
     await this.daikinApi.setScheduleState(this.deviceId, Boolean(value));
   }

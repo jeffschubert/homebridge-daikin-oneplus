@@ -32,7 +32,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   private readonly daikinApi: DaikinApi;
   private discoverTimer: NodeJS.Timeout | undefined;
 
-  constructor(log: Logging, config: PlatformConfig, api: API) {
+  public constructor(log: Logging, config: PlatformConfig, api: API) {
     this.accessories = [];
     this.api = api;
     this.log = log;
@@ -116,7 +116,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
    * This function is invoked when homebridge restores cached accessories from disk at startup.
    * It should be used to setup event handlers for characteristics and update respective values.
    */
-  configureAccessory(accessory: PlatformAccessory<AccessoryContext>) {
+  public configureAccessory(accessory: PlatformAccessory<AccessoryContext>) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
 
     // add the restored accessory to the accessories cache so we can track if it has already been registered
@@ -128,7 +128,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
    * Accessories must only be registered once, previously created accessories
    * must not be registered again to prevent "duplicate UUID" errors.
    */
-  async discoverDevices() {
+  private async discoverDevices() {
     if (!this.config.user && !this.config.password) {
       this.log.error('Credentials not set. Aborting discovery of devices.');
       return;
@@ -489,7 +489,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     return this.config.includeDeviceName ? `${device.name} ${accessory}` : accessory;
   }
 
-  public debug(message: string, ...parameters: unknown[]): void {
+  private debug(message: string, ...parameters: unknown[]): void {
     if (this.config.debug) {
       this.log.info(message, ...parameters);
     }

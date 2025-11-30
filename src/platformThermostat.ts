@@ -10,7 +10,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
 export class DaikinOnePlusThermostat {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
@@ -110,7 +110,7 @@ export class DaikinOnePlusThermostat {
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     const targetHeatingCoolingState = this.handleThermostatModeGet();
     const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
     const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
@@ -146,7 +146,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Current Heating Cooling State" characteristic
    */
-  handleCurrentHeatingCoolingStateGet(): CharacteristicValue {
+  private handleCurrentHeatingCoolingStateGet(): CharacteristicValue {
     //"equipmentStatus": the running state of the system, 1=cooling, 2=overcool dehumidifying, 3=heating, 4=fan, 5=idle,
     // set this to a valid value for CurrentHeatingCoolingState
     let currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.OFF;
@@ -166,7 +166,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
    */
-  handleThermostatModeGet(): CharacteristicValue {
+  private handleThermostatModeGet(): CharacteristicValue {
     // set this to a valid value for ThermostatMode
     let currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
     const currentStatus = this.daikinApi.getTargetState(this.deviceId);
@@ -200,7 +200,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Current Temperature" characteristic
    */
-  handleCurrentTemperatureGet(): CharacteristicValue {
+  private handleCurrentTemperatureGet(): CharacteristicValue {
     let currentTemp = this.daikinApi.getCurrentTemp(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (currentTemp < -270) {
@@ -215,7 +215,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Target Temperature" characteristic
    */
-  handleTargetTemperatureGet(): CharacteristicValue {
+  private handleTargetTemperatureGet(): CharacteristicValue {
     let targetTemp = this.daikinApi.getTargetTemp(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (targetTemp < 10) {
@@ -227,7 +227,7 @@ export class DaikinOnePlusThermostat {
     return targetTemp;
   }
 
-  handleHeatingThresholdTemperatureGet(): CharacteristicValue {
+  private handleHeatingThresholdTemperatureGet(): CharacteristicValue {
     let temp = this.daikinApi.heatingThresholdTemperature(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (temp < 0) {
@@ -239,7 +239,7 @@ export class DaikinOnePlusThermostat {
     return temp;
   }
 
-  handleCoolingThresholdTemperatureGet(): CharacteristicValue {
+  private handleCoolingThresholdTemperatureGet(): CharacteristicValue {
     let temp = this.daikinApi.coolingThresholdTemperature(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (temp < 10) {
@@ -254,7 +254,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Temperature Display Units" characteristic
    */
-  handleTemperatureDisplayUnitsGet(): CharacteristicValue {
+  private handleTemperatureDisplayUnitsGet(): CharacteristicValue {
     let targetUnits = this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT;
     const displayUnits = this.daikinApi.getDisplayUnits(this.deviceId);
     // set this to a valid value for TemperatureDisplayUnits
@@ -270,7 +270,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Current Relative Humidity" characteristic
    */
-  handleCurrentHumidityGet(): CharacteristicValue {
+  private handleCurrentHumidityGet(): CharacteristicValue {
     let currentHumidity = this.daikinApi.getCurrentHumidity(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (currentHumidity < 0) {
@@ -285,7 +285,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to get the current value of the "Target Temperature" characteristic
    */
-  handleTargetHumidityGet(): CharacteristicValue {
+  private handleTargetHumidityGet(): CharacteristicValue {
     let targetHumidity = this.daikinApi.getTargetHumidity(this.deviceId);
     // set this to a valid value for CurrentTemperature
     if (targetHumidity < 0) {
@@ -300,7 +300,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Target Heating Cooling State" characteristic
    */
-  async handleThermostatModeSet(value: CharacteristicValue) {
+  private async handleThermostatModeSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set ThermostatMode: %s', this.accessory.displayName, value);
 
     // set this to a valid value for ThermostatMode
@@ -335,7 +335,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Target Temperature" characteristic
    */
-  async handleTargetTemperatureSet(value: CharacteristicValue) {
+  private async handleTargetTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TargetTemperature: %s', this.accessory.displayName, value);
     await this.daikinApi.setTargetTemps(this.deviceId, Number(value));
   }
@@ -343,7 +343,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Cooling Threshold Temperature" characteristic
    */
-  async handleCoolingThresholdTemperatureSet(value: CharacteristicValue) {
+  private async handleCoolingThresholdTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set CoolingThresholdTemperature: %s', this.accessory.displayName, value);
     await this.daikinApi.setTargetTemps(this.deviceId, undefined, undefined, Number(value));
   }
@@ -351,7 +351,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Heating Threshold Temperature" characteristic
    */
-  async handleHeatingThresholdTemperatureSet(value: CharacteristicValue) {
+  private async handleHeatingThresholdTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set HeatingThresholdTemperature: %s', this.accessory.displayName, value);
     await this.daikinApi.setTargetTemps(this.deviceId, undefined, Number(value), undefined);
   }
@@ -359,7 +359,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Temperature Display Units" characteristic
    */
-  async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
+  private async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TemperatureDisplayUnits: %s', this.accessory.displayName, value);
     let requestedUnits = 0; //FAHRENHEIT
     switch (value) {
@@ -378,7 +378,7 @@ export class DaikinOnePlusThermostat {
   /**
    * Handle requests to set the "Target Humidity" characteristic
    */
-  async handleTargetHumiditySet(value: CharacteristicValue) {
+  private async handleTargetHumiditySet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TargetHumidity: %s', this.accessory.displayName, value);
     await this.daikinApi.setTargetHumidity(this.deviceId, Number(value));
   }
