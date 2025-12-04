@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi, TargetHeatingCoolingState } from './daikinapi';
-
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext, ThermostatMode } from './types.js';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
  * Emergency Heat Switch
@@ -12,9 +12,9 @@ import { DaikinOnePlusPlatform } from './platform';
 export class DaikinOnePlusEmergencyHeatSwitch {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
   ) {
@@ -40,22 +40,21 @@ export class DaikinOnePlusEmergencyHeatSwitch {
       })
       .onSet(this.handleCurrentStateSet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
+  private updateValues() {
     const value = this.handleCurrentStateGet();
+    // Keep emergency heat flag in sync with actual device state (handles startup + external changes)
+    this.daikinApi.setEmergencyHeatEnabled(this.deviceId, value);
     this.service.updateCharacteristic(this.platform.Characteristic.On, value);
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
-  handleCurrentStateGet(): boolean {
-    const currentState =
-      this.daikinApi.deviceHasData(this.deviceId) &&
-      this.daikinApi.getTargetState(this.deviceId) === TargetHeatingCoolingState.AUXILIARY_HEAT;
+  private handleCurrentStateGet(): boolean {
+    const currentState = this.daikinApi.getTargetState(this.deviceId) === ThermostatMode.EMERGENCY_HEAT;
     this.platform.log.debug('%s - Get Emergency Heat State: %s', this.accessory.displayName, currentState);
     return currentState;
   }
@@ -63,8 +62,10 @@ export class DaikinOnePlusEmergencyHeatSwitch {
   /**
    * Handle requests to set the "On" characteristic
    */
-  async handleCurrentStateSet(value: CharacteristicValue) {
+  private async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Emergency Heat State: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetState(this.deviceId, value ? TargetHeatingCoolingState.AUXILIARY_HEAT : TargetHeatingCoolingState.HEAT);
+    // Record intent FIRST (synchronously) so thermostat mode changes can honor it
+    this.daikinApi.setEmergencyHeatEnabled(this.deviceId, !!value);
+    await this.daikinApi.setTargetState(this.deviceId, value ? ThermostatMode.EMERGENCY_HEAT : ThermostatMode.HEAT);
   }
 }

@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["DOM", "ES2022"],
-    "module": "commonjs",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -10,7 +11,7 @@
     "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
     "forceConsistentCasingInFileNames": true
   },
   "include": ["src/"]

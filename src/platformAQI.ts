@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi } from './daikinapi';
-
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext } from './types.js';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
  * Air Quality Sensor
@@ -11,9 +11,9 @@ import { DaikinOnePlusPlatform } from './platform';
 export class DaikinOnePlusAQSensor {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
     private readonly forIndoor: boolean,
@@ -54,30 +54,25 @@ export class DaikinOnePlusAQSensor {
       });
     }
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
-    // push the new value to HomeKit
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, this.handleAirQualityGet());
-      if (this.forIndoor) {
-        this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
-      } else {
-        this.service.updateCharacteristic(this.platform.Characteristic.OzoneDensity, this.handleOzoneGet());
-      }
-      const aqValue = this.handleAirQualityValueGet();
-      this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.accessory.displayName} ${aqValue}`);
-
-      this.service.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.handlePM2_5DensityGet());
+  private updateValues() {
+    this.service.updateCharacteristic(this.platform.Characteristic.AirQuality, this.handleAirQualityGet());
+    if (this.forIndoor) {
+      this.service.updateCharacteristic(this.platform.Characteristic.VOCDensity, this.handleVocDensityGet());
+    } else {
+      this.service.updateCharacteristic(this.platform.Characteristic.OzoneDensity, this.handleOzoneGet());
     }
+    const aqValue = this.handleAirQualityValueGet();
+    this.service.setCharacteristic(this.platform.Characteristic.Name, `${this.accessory.displayName} ${aqValue}`);
+    this.service.updateCharacteristic(this.platform.Characteristic.PM2_5Density, this.handlePM2_5DensityGet());
   }
 
   /**
    * Handle requests to get the current value of the "Air Quality" characteristic
    */
-  handleAirQualityGet(): CharacteristicValue {
+  private handleAirQualityGet(): CharacteristicValue {
     const currentAqLevel = this.daikinApi.getAirQualityLevel(this.deviceId, this.forIndoor);
 
     let currentValue = this.platform.Characteristic.AirQuality.UNKNOWN;
@@ -102,7 +97,7 @@ export class DaikinOnePlusAQSensor {
   /**
    * Handle requests to get the current value of the "Ozone Density" characteristic
    */
-  handleOzoneGet(): CharacteristicValue {
+  private handleOzoneGet(): CharacteristicValue {
     let currentValue = this.daikinApi.getOzone(this.deviceId, this.forIndoor);
     if (currentValue < 0) {
       currentValue = 0;
@@ -116,7 +111,7 @@ export class DaikinOnePlusAQSensor {
   /**
    * Handle requests to get the current value of the "Current Temperature" characteristic
    */
-  handleAirQualityValueGet(): CharacteristicValue {
+  private handleAirQualityValueGet(): CharacteristicValue {
     let currentValue = this.daikinApi.getAirQualityValue(this.deviceId, this.forIndoor);
     // set this to a valid value for CurrentTemperature
     if (currentValue < 0) {
@@ -131,7 +126,7 @@ export class DaikinOnePlusAQSensor {
   /**
    * Handle requests to get the current value of the "PM2.5 Density" characteristic
    */
-  handlePM2_5DensityGet(): CharacteristicValue {
+  private handlePM2_5DensityGet(): CharacteristicValue {
     let currentValue = this.daikinApi.getPM2_5Density(this.deviceId, this.forIndoor);
     // set this to a valid value for CurrentTemperature
     if (currentValue < 0) {
@@ -146,7 +141,7 @@ export class DaikinOnePlusAQSensor {
   /**
    * Handle requests to get the current value of the "Current Relative Humidity" characteristic
    */
-  handleVocDensityGet(): CharacteristicValue {
+  private handleVocDensityGet(): CharacteristicValue {
     let currentValue = this.daikinApi.getVocDensity(this.deviceId, this.forIndoor);
     // set this to a valid value for CurrentTemperature
     if (currentValue < 0) {

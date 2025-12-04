@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi } from './daikinapi';
-
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext } from './types.js';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
  * Platform Accessory
@@ -11,9 +11,9 @@ import { DaikinOnePlusPlatform } from './platform';
 export class DaikinOnePlusHumidity {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
     private readonly forIndoor: boolean,
@@ -38,20 +38,17 @@ export class DaikinOnePlusHumidity {
       return this.handleHumidityGet();
     });
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
-    if (this.daikinApi.deviceHasData(this.deviceId)) {
-      this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleHumidityGet());
-    }
+  private updateValues() {
+    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleHumidityGet());
   }
 
   /**
    * Handle requests to get the current value of the Humidity characteristic
    */
-  handleHumidityGet(): CharacteristicValue {
+  private handleHumidityGet(): CharacteristicValue {
     let currentHumidity = this.forIndoor
       ? this.daikinApi.getCurrentHumidity(this.deviceId)
       : this.daikinApi.getOutdoorHumidity(this.deviceId);

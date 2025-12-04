@@ -1,42 +1,60 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import tsParser from "@typescript-eslint/parser";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import js from "@eslint/js";
-import { FlatCompat } from "@eslint/eslintrc";
+import js from '@eslint/js';
+import tseslint from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
+import prettier from 'eslint-config-prettier';
+import promisePlugin from 'eslint-plugin-promise';
+import globals from 'globals';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const compat = new FlatCompat({
-    baseDirectory: __dirname,
-    recommendedConfig: js.configs.recommended,
-    allConfig: js.configs.all
-});
-
-export default defineConfig([globalIgnores(["**/dist"]), {
-    extends: compat.extends(
-        "eslint:recommended",
-        "plugin:@typescript-eslint/eslint-recommended",
-        "plugin:@typescript-eslint/recommended",
-        "prettier",
-    ),
-
+export default [
+  {
+    ignores: ['**/dist'],
+  },
+  {
+    files: ['src/**/*.ts'],
     languageOptions: {
-        parser: tsParser,
-        ecmaVersion: 2018,
-        sourceType: "module",
+      parser: tsParser,
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        NodeJS: 'readonly',
+      },
     },
-
+    plugins: {
+      '@typescript-eslint': tseslint,
+      promise: promisePlugin,
+    },
     rules: {
-        "dot-notation": "off",
-        eqeqeq: "warn",
-        curly: ["warn", "all"],
-        "prefer-arrow-callback": ["warn"],
-        "no-console": ["warn"],
-        "no-non-null-assertion": ["off"],
+      ...js.configs.recommended.rules,
+      ...tseslint.configs.recommended.rules,
 
-        "@typescript-eslint/explicit-function-return-type": "off",
-        "@typescript-eslint/no-non-null-assertion": "off",
-        "@typescript-eslint/explicit-module-boundary-types": "off",
+      'dot-notation': 'off',
+      eqeqeq: 'warn',
+      curly: ['warn', 'all'],
+      'prefer-arrow-callback': ['warn'],
+      'no-console': ['warn'],
+      'no-non-null-assertion': ['off'],
+
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/require-await': 'error',
+
+      // Enforce async/await over .then()/.catch()
+      'promise/prefer-await-to-then': 'error',
+      'promise/prefer-await-to-callbacks': 'warn',
+
+      // Enforce explicit visibility modifiers on class members
+      '@typescript-eslint/explicit-member-accessibility': 'error',
     },
-}]);
+  },
+  prettier,
+];

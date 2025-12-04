@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-import { DaikinApi } from './daikinapi';
-
-import { DaikinOnePlusPlatform } from './platform';
+import { DaikinApi } from './daikinapi.js';
+import { AccessoryContext } from './types.js';
+import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
  * Platform Accessory
@@ -11,9 +11,9 @@ import { DaikinOnePlusPlatform } from './platform';
 export class DaikinOnePlusScheduleSwitch {
   private service: Service;
 
-  constructor(
+  public constructor(
     private readonly platform: DaikinOnePlusPlatform,
-    private readonly accessory: PlatformAccessory,
+    private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
   ) {
@@ -39,26 +39,24 @@ export class DaikinOnePlusScheduleSwitch {
       })
       .onSet(this.handleCurrentStateSet.bind(this));
 
-    this.updateValues();
-    this.daikinApi.addListener(this.updateValues.bind(this));
+    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
-  updateValues() {
-    const value = this.handleCurrentStateGet();
-    this.service.updateCharacteristic(this.platform.Characteristic.On, value);
+  private updateValues() {
+    this.service.updateCharacteristic(this.platform.Characteristic.On, this.handleCurrentStateGet());
   }
 
   /**
    * Handle requests to get the current value of the "On" characteristic
    */
-  handleCurrentStateGet(): boolean {
-    return this.daikinApi.deviceHasData(this.deviceId) && this.daikinApi.getScheduleState(this.deviceId);
+  private handleCurrentStateGet(): boolean {
+    return this.daikinApi.getScheduleState(this.deviceId);
   }
 
   /**
    * Handle requests to set the "On" characteristic
    */
-  async handleCurrentStateSet(value: CharacteristicValue) {
+  private async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Schedule State: %s', this.accessory.displayName, value);
     await this.daikinApi.setScheduleState(this.deviceId, Boolean(value));
   }
