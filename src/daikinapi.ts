@@ -274,21 +274,19 @@ export class DaikinApi {
     this.log.debug('Getting token...');
     try {
       const response = await fetch(DAIKIN_API_LOGIN_URL, {
-          method: "POST",
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: this.user,
-            password: this.password,
-          }),
-        
-        }
-      );
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: this.user,
+          password: this.password,
+        }),
+      });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json())
+        const errorMessage = JSON.stringify(response.json());
         throw new Error(errorMessage);
       }
 
@@ -326,21 +324,20 @@ export class DaikinApi {
       return this.getToken();
     }
     try {
-        const response = await fetch(DAIKIN_API_TOKEN_URL, {
-          method: "POST",
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: this.user,
-            refreshToken: this._token.refreshToken,
-          }),
-        }
-      );
+      const response = await fetch(DAIKIN_API_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: this.user,
+          refreshToken: this._token.refreshToken,
+        }),
+      });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json())
+        const errorMessage = JSON.stringify(response.json());
         throw new Error(errorMessage);
       }
 
@@ -361,18 +358,17 @@ export class DaikinApi {
     }
     try {
       const response = await fetch(uri, {
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${this._token.accessToken}`,
-          },
-        }
-      );
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${this._token.accessToken}`,
+        },
+      });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json())
+        const errorMessage = JSON.stringify(response.json());
         throw new Error(errorMessage);
       }
-     return response.json();
+      return response.json();
     } catch (error) {
       this.logError(`Error with getRequest: ${uri}`, error);
       return undefined;
@@ -704,7 +700,7 @@ export class DaikinApi {
 
     try {
       const response = await fetch(getDeviceUrl(deviceId), {
-        method: "PUT",
+        method: 'PUT',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
@@ -714,7 +710,7 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json())
+        const errorMessage = JSON.stringify(response.json());
         throw new Error(errorMessage);
       }
 
