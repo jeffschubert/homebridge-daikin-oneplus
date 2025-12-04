@@ -1,4 +1,3 @@
-import axios, { AxiosResponse } from 'axios';
 import { hrtime } from 'process';
 import { Logging } from 'homebridge';
 import {
@@ -32,6 +31,16 @@ const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
 
 // User is interacting with a HomeKit controller - latest data needed
 const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
+
+const DAIKIN_API_LOGIN_URL = 'https://api.daikinskyport.com/users/auth/login';
+
+const DAIKIN_API_DEVICES_URL = 'https://api.daikinskyport.com/devices';
+
+const DAIKIN_API_TOKEN_URL = 'https://api.daikinskyport.com/users/auth/token';
+
+const getDeviceUrl = (deviceId: string) => {
+  return `https://api.daikinskyport.com/deviceData/${deviceId}`;
+};
 
 export class DaikinApi {
   private _token: DaikinTokenResponse | undefined;
@@ -264,27 +273,34 @@ export class DaikinApi {
   private async getToken() {
     this.log.debug('Getting token...');
     try {
-      const response = await axios.post(
-        'https://api.daikinskyport.com/users/auth/login',
-        {
-          email: this.user,
-          password: this.password,
-        },
-        {
+      const response = await fetch(DAIKIN_API_LOGIN_URL, {
+          method: "POST",
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },
-        },
+          body: JSON.stringify({
+            email: this.user,
+            password: this.password,
+          }),
+        
+        }
       );
-      this.setToken(response);
+
+      if (!response.ok) {
+        const errorMessage = JSON.stringify(response.json())
+        throw new Error(errorMessage);
+      }
+
+      const token: DaikinTokenResponse = await response.json();
+      this.setToken(token);
     } catch (error) {
       this.logError('Error getting token:', error);
     }
   }
 
-  private setToken(response: AxiosResponse<DaikinTokenResponse>) {
-    this._token = response.data;
+  private setToken(token: DaikinTokenResponse) {
+    this._token = token;
     this._tokenExpiration = new Date();
 
     const expSeconds =
@@ -295,13 +311,13 @@ export class DaikinApi {
   }
 
   private async getDevices() {
-    const response: Thermostat[] = (await this.getRequest('https://api.daikinskyport.com/devices')) ?? [];
+    const response: Thermostat[] = (await this.getRequest(DAIKIN_API_DEVICES_URL)) ?? [];
     this._devices = new Map(response.map(d => [d.id, d]));
     return this._devices;
   }
 
   public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
-    return await this.getRequest(`https://api.daikinskyport.com/deviceData/${deviceId}`);
+    return await this.getRequest(getDeviceUrl(deviceId));
   }
 
   private async refreshToken() {
@@ -310,20 +326,26 @@ export class DaikinApi {
       return this.getToken();
     }
     try {
-      const response = await axios.post(
-        'https://api.daikinskyport.com/users/auth/token',
-        {
-          email: this.user,
-          refreshToken: this._token.refreshToken,
-        },
-        {
+        const response = await fetch(DAIKIN_API_TOKEN_URL, {
+          method: "POST",
           headers: {
             Accept: 'application/json',
             'Content-Type': 'application/json',
           },
-        },
+          body: JSON.stringify({
+            email: this.user,
+            refreshToken: this._token.refreshToken,
+          }),
+        }
       );
-      this.setToken(response);
+
+      if (!response.ok) {
+        const errorMessage = JSON.stringify(response.json())
+        throw new Error(errorMessage);
+      }
+
+      const token: DaikinTokenResponse = await response.json();
+      this.setToken(token);
     } catch (error) {
       this.logError('Error refreshing token:', error);
     }
@@ -338,13 +360,19 @@ export class DaikinApi {
       return undefined;
     }
     try {
-      const response = await axios.get(uri, {
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${this._token.accessToken}`,
-        },
-      });
-      return response.data;
+      const response = await fetch(uri, {
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${this._token.accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorMessage = JSON.stringify(response.json())
+        throw new Error(errorMessage);
+      }
+     return response.json();
     } catch (error) {
       this.logError(`Error with getRequest: ${uri}`, error);
       return undefined;
@@ -675,14 +703,22 @@ export class DaikinApi {
     }
 
     try {
-      const res = await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, requestData, {
+      const response = await fetch(getDeviceUrl(deviceId), {
+        method: "PUT",
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
+        body: JSON.stringify(requestData),
       });
-      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
+
+      if (!response.ok) {
+        const errorMessage = JSON.stringify(response.json())
+        throw new Error(errorMessage);
+      }
+
+      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(response.json()));
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       this.log.debug(
         'WF: %d ; %d ; GT: %d ; %d',
