@@ -286,8 +286,8 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json());
-        throw new Error(errorMessage);
+        this.logError(`Request ${DAIKIN_API_LOGIN_URL} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        return;
       }
 
       const token: DaikinTokenResponse = await response.json();
@@ -337,8 +337,8 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json());
-        throw new Error(errorMessage);
+        this.logError(`Request ${DAIKIN_API_TOKEN_URL} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        return;
       }
 
       const token: DaikinTokenResponse = await response.json();
@@ -365,8 +365,8 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json());
-        throw new Error(errorMessage);
+        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        return undefined;
       }
       return response.json();
     } catch (error) {
@@ -699,7 +699,8 @@ export class DaikinApi {
     }
 
     try {
-      const response = await fetch(getDeviceUrl(deviceId), {
+      const uri = getDeviceUrl(deviceId);
+      const response = await fetch(uri, {
         method: 'PUT',
         headers: {
           Accept: 'application/json',
@@ -710,8 +711,9 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        const errorMessage = JSON.stringify(response.json());
-        throw new Error(errorMessage);
+        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+        return false;
       }
 
       this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(response.json()));
@@ -748,20 +750,7 @@ export class DaikinApi {
 
   private logError(message: string, error: unknown): boolean {
     this.log.error(message);
-    // Handle axios errors which have response/request properties
-    const axiosError = error as { response?: { data: unknown; status: number; headers: unknown }; request?: unknown; message?: string };
-    if (axiosError.response) {
-      // When response status code is out of 2xx range
-      this.log.error('Response status: %d', axiosError.response.status);
-      this.log.error('Response data: %s', JSON.stringify(axiosError.response.data));
-      this.log.error('Response headers: %s', JSON.stringify(axiosError.response.headers));
-    } else if (axiosError.request) {
-      // When no response was received after request was made
-      this.log.error('No response received for request');
-    } else {
-      // Error
-      this.log.error(axiosError.message ?? String(error));
-    }
+    this.log.error(String(error));
     return false;
   }
 }
