@@ -283,7 +283,10 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        this.logError(`Request ${DAIKIN_API_LOGIN_URL} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        this.logError(
+          `Request ${DAIKIN_API_LOGIN_URL} failed with status ${response.status} - ${response.statusText}.`,
+          await response.text(),
+        );
         return;
       }
 
@@ -334,7 +337,10 @@ export class DaikinApi {
       });
 
       if (!response.ok) {
-        this.logError(`Request ${DAIKIN_API_TOKEN_URL} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        this.logError(
+          `Request ${DAIKIN_API_TOKEN_URL} failed with status ${response.status} - ${response.statusText}.`,
+          await response.text(),
+        );
         return;
       }
 
