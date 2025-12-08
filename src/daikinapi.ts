@@ -1,4 +1,3 @@
-import axios, { AxiosResponse } from 'axios';
 import { hrtime } from 'process';
 import { Logging } from 'homebridge';
 import {
@@ -32,6 +31,16 @@ const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
 
 // User is interacting with a HomeKit controller - latest data needed
 const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
+
+const DAIKIN_API_LOGIN_URL = 'https://api.daikinskyport.com/users/auth/login';
+
+const DAIKIN_API_DEVICES_URL = 'https://api.daikinskyport.com/devices';
+
+const DAIKIN_API_TOKEN_URL = 'https://api.daikinskyport.com/users/auth/token';
+
+const getDeviceUrl = (deviceId: string) => {
+  return `https://api.daikinskyport.com/deviceData/${deviceId}`;
+};
 
 export class DaikinApi {
   private _token: DaikinTokenResponse | undefined;
@@ -124,9 +133,6 @@ export class DaikinApi {
     return this._isInitialized;
   }
 
-  //TODO: if writing data or timer exists to write data, don't send get request
-  //TODO: if data received while writing or waiting to write, toss
-  //TODO: if above is done, then gets after, but within write delay time will get delayed.
   private async getData() {
     this.log.debug('Getting data...');
     this._lastReadStartTimeMs = this._monotonic_clock_ms();
@@ -142,7 +148,7 @@ export class DaikinApi {
     for (const device of this._devices.values()) {
       const data = await this.getDeviceData(device.id);
       if (!data) {
-        this.log.error('Unable to retrieve data for %s.', device.name);
+        this.log.error('Unable to retrieve data for %s [%s].', device.id, device.name);
         continue;
       }
       this._updateCache(device.id, data);
@@ -264,27 +270,35 @@ export class DaikinApi {
   private async getToken() {
     this.log.debug('Getting token...');
     try {
-      const response = await axios.post(
-        'https://api.daikinskyport.com/users/auth/login',
-        {
+      const response = await fetch(DAIKIN_API_LOGIN_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: this.user,
           password: this.password,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-      this.setToken(response);
+        }),
+      });
+
+      if (!response.ok) {
+        this.logError(
+          `Request ${DAIKIN_API_LOGIN_URL} failed with status ${response.status} - ${response.statusText}.`,
+          await response.text(),
+        );
+        return;
+      }
+
+      const token: DaikinTokenResponse = await response.json();
+      this.setToken(token);
     } catch (error) {
       this.logError('Error getting token:', error);
     }
   }
 
-  private setToken(response: AxiosResponse<DaikinTokenResponse>) {
-    this._token = response.data;
+  private setToken(token: DaikinTokenResponse) {
+    this._token = token;
     this._tokenExpiration = new Date();
 
     const expSeconds =
@@ -295,13 +309,13 @@ export class DaikinApi {
   }
 
   private async getDevices() {
-    const response: Thermostat[] = (await this.getRequest('https://api.daikinskyport.com/devices')) ?? [];
+    const response: Thermostat[] = (await this.getRequest(DAIKIN_API_DEVICES_URL)) ?? [];
     this._devices = new Map(response.map(d => [d.id, d]));
     return this._devices;
   }
 
   public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
-    return await this.getRequest(`https://api.daikinskyport.com/deviceData/${deviceId}`);
+    return await this.getRequest(getDeviceUrl(deviceId));
   }
 
   private async refreshToken() {
@@ -310,20 +324,28 @@ export class DaikinApi {
       return this.getToken();
     }
     try {
-      const response = await axios.post(
-        'https://api.daikinskyport.com/users/auth/token',
-        {
+      const response = await fetch(DAIKIN_API_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: this.user,
           refreshToken: this._token.refreshToken,
-        },
-        {
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-      this.setToken(response);
+        }),
+      });
+
+      if (!response.ok) {
+        this.logError(
+          `Request ${DAIKIN_API_TOKEN_URL} failed with status ${response.status} - ${response.statusText}.`,
+          await response.text(),
+        );
+        return;
+      }
+
+      const token: DaikinTokenResponse = await response.json();
+      this.setToken(token);
     } catch (error) {
       this.logError('Error refreshing token:', error);
     }
@@ -338,13 +360,18 @@ export class DaikinApi {
       return undefined;
     }
     try {
-      const response = await axios.get(uri, {
+      const response = await fetch(uri, {
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
       });
-      return response.data;
+
+      if (!response.ok) {
+        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        return undefined;
+      }
+      return response.json();
     } catch (error) {
       this.logError(`Error with getRequest: ${uri}`, error);
       return undefined;
@@ -653,10 +680,6 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
   }
 
-  //TODO: track data to be written per device
-  //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for it)
-  //TODO: reset timer on every device's request. once there's a full second without a request, then send?
-  //TODO: always update cache data with requested so that local stays current with what will be state once written.
   private async putRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
     this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
@@ -675,14 +698,24 @@ export class DaikinApi {
     }
 
     try {
-      const res = await axios.put(`https://api.daikinskyport.com/deviceData/${deviceId}`, requestData, {
+      const uri = getDeviceUrl(deviceId);
+      const response = await fetch(uri, {
+        method: 'PUT',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
+        body: JSON.stringify(requestData),
       });
-      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(res.data));
+
+      if (!response.ok) {
+        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+        this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
+        return false;
+      }
+
+      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(response.json()));
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       this.log.debug(
         'WF: %d ; %d ; GT: %d ; %d',
@@ -695,7 +728,7 @@ export class DaikinApi {
       this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
       return true;
     } catch (error) {
-      this.logError(errorHeader, error);
+      this.logError(`${errorHeader} Device: ${deviceId}:`, error);
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       return false;
     }
@@ -716,20 +749,7 @@ export class DaikinApi {
 
   private logError(message: string, error: unknown): boolean {
     this.log.error(message);
-    // Handle axios errors which have response/request properties
-    const axiosError = error as { response?: { data: unknown; status: number; headers: unknown }; request?: unknown; message?: string };
-    if (axiosError.response) {
-      // When response status code is out of 2xx range
-      this.log.error('Response status: %d', axiosError.response.status);
-      this.log.error('Response data: %s', JSON.stringify(axiosError.response.data));
-      this.log.error('Response headers: %s', JSON.stringify(axiosError.response.headers));
-    } else if (axiosError.request) {
-      // When no response was received after request was made
-      this.log.error('No response received for request');
-    } else {
-      // Error
-      this.log.error(axiosError.message ?? String(error));
-    }
+    this.log.error(String(error));
     return false;
   }
 }
