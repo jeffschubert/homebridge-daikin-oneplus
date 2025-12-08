@@ -71,7 +71,7 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
 "platforms": [
   {
     "platform": "DaikinOnePlus",
-    "name": "Daikin One+",              // Required. The name of the thermostat. Can be anything.
+    "name": "Daikin One Plus",          // Required. The name of the thermostat. Can be anything.
     "user": "any@email.address",        // Required. The email of your Daikin One+ account.
     "password": "password",             // Required.
     "includeDeviceName": false,         // Required. Should the default sensor names start with the thermostat name (as configured in the thermostat).
@@ -87,6 +87,8 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "enableOneCleanFan": false,         // If true, enable fan accessory that allows the user to run one clean.
     "enableCirculateAirFan": false,     // If true, enable fan accessory that allows the user to run the fan constantly at the specified speed.
     "enableScheduleSwitch": false,      // If true, enable switch accessory to get/set the Schedule state of thermostats found in Daikin account.
+    "debug": false,                     // If true, enables debug level logging.
+    "logRaw": false,                    // If true, enables logging of raw device data from Daikin API. \'debug\' must also be set to true.
   }
 ]
 ```

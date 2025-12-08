@@ -62,6 +62,7 @@ export class DaikinApi {
   private user: string;
   private password: string;
   private log: Logging;
+  private logRaw: boolean;
 
   // Pending thresholds per device for AUTO mode. HomeKit sends heat and cool thresholds
   // separately, but the Daikin API requires both in a single request.
@@ -71,10 +72,11 @@ export class DaikinApi {
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
   private _emergencyHeatEnabled: Map<string, boolean> = new Map();
 
-  public constructor(user: string, password: string, log: Logging) {
+  public constructor(user: string, password: string, log: Logging, logRaw: boolean) {
     this.log = log;
     this.user = user;
     this.password = password;
+    this.logRaw = logRaw;
   }
 
   public addListener(deviceId: string, listener: DataChanged) {
@@ -744,6 +746,9 @@ export class DaikinApi {
       ...(cachedDevice.data ?? {}),
       ...partialUpdate,
     } as ThermostatData;
+    if (this.logRaw) {
+      this.log.debug('Updated cache for %s: %s', deviceId, JSON.stringify(partialUpdate));
+    }
     this.log.debug('Updated cache for %s', deviceId);
   }
 

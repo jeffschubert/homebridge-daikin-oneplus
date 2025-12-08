@@ -11,7 +11,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Daikin One+"
+        "default": "Daikin One Plus"
       },
       "user": {
         "title": "Daikin Username",
@@ -112,6 +112,12 @@
         "description": "When the Away switch is toggled off, automatically enable the schedule.",
         "type": "boolean",
         "default": false
+      },
+      "logRaw": {
+        "title": "Device Data Logging",
+        "type": "boolean",
+        "description": "Enables logging of raw device data from Daikin API. Debug logging must also be enabled. Defaults to false. <br>WARNING: May include sensitive or identifying information. Review before sharing. Will also significantly increase log size.",
+        "default": false
       }
     }
   },
@@ -169,6 +175,7 @@
       "expanded": false,
       "items": [
         "debug",
+        "logRaw",
         "includeDeviceName"
       ]
     }]

@@ -70,6 +70,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       ignoreThermostat: !!config.ignoreThermostat,
       ignoreOutdoorTemp: !!config.ignoreOutdoorTemp,
       autoResumeSchedule: !!config.autoResumeSchedule,
+      logRaw: !!config.debug && !!config.logRaw,
     };
 
     this.debug('Debug logging on. Expect lots of messages.');
@@ -77,7 +78,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.debug('Using Include Device Name setting of %s.', this.config.includeDeviceName);
     this.debug('Finished initializing platform: %s', this.config.name);
 
-    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log);
+    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,

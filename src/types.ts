@@ -261,4 +261,5 @@ export interface DaikinOptions {
   ignoreThermostat: boolean;
   ignoreOutdoorTemp: boolean;
   autoResumeSchedule: boolean;
+  logRaw: boolean;
 }
