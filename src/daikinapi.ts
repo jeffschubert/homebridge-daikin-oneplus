@@ -133,9 +133,6 @@ export class DaikinApi {
     return this._isInitialized;
   }
 
-  //TODO: if writing data or timer exists to write data, don't send get request
-  //TODO: if data received while writing or waiting to write, toss
-  //TODO: if above is done, then gets after, but within write delay time will get delayed.
   private async getData() {
     this.log.debug('Getting data...');
     this._lastReadStartTimeMs = this._monotonic_clock_ms();
@@ -151,7 +148,7 @@ export class DaikinApi {
     for (const device of this._devices.values()) {
       const data = await this.getDeviceData(device.id);
       if (!data) {
-        this.log.error('Unable to retrieve data for %s.', device.name);
+        this.log.error('Unable to retrieve data for %s [%s].', device.id, device.name);
         continue;
       }
       this._updateCache(device.id, data);
@@ -677,10 +674,6 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
   }
 
-  //TODO: track data to be written per device
-  //TODO: buffer write requests per device for up to a second (create timer? per device that when elapsed writes anything requested for it)
-  //TODO: reset timer on every device's request. once there's a full second without a request, then send?
-  //TODO: always update cache data with requested so that local stays current with what will be state once written.
   private async putRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
     this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
@@ -729,7 +722,7 @@ export class DaikinApi {
       this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
       return true;
     } catch (error) {
-      this.logError(errorHeader, error);
+      this.logError(`${errorHeader} Device: ${deviceId}:`, error);
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       return false;
     }
