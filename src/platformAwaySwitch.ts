@@ -4,9 +4,8 @@ import { AccessoryContext } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
- * Platform Accessory
- * An instance of this class is created for each accessory your platform registers
- * Each accessory may expose multiple services of different service types.
+ * Away Mode Switch
+ * A switch accessory to show and toggle the Away Mode state
  */
 export class DaikinOnePlusAwaySwitch {
   private service: Service;
@@ -50,7 +49,9 @@ export class DaikinOnePlusAwaySwitch {
    * Handle requests to get the current value of the "On" characteristic
    */
   private handleCurrentStateGet(): boolean {
-    return this.daikinApi.getAwayState(this.deviceId);
+    const currentState = this.daikinApi.getAwayState(this.deviceId);
+    this.platform.log.debug('%s - Get Away State:', this.accessory.displayName, currentState);
+    return currentState;
   }
 
   /**
