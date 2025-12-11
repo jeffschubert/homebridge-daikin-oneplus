@@ -26,6 +26,10 @@
   * Away switch
     * Display and set thermostat's away state
     * Optionally, the schedule can be enabled automatically when the Away switch is toggled off. By default this plugin and the thermostat itself do not enable the schedule after returning from Away.
+  * System State switches
+    * Read-only switches for each possible thermostat state (heating, cooling, fan, idle, and overcool/dehumidify).
+    * Switch will display as On when the thermostat is in the respective state and as Off otherwise.
+    * Useful for triggering Home automations when the system starts or stops the pertinent state(s).
   * Emergency Heat switch
     * Display and set thermostat's emergency/auxiliary heat state
   * One Clean fan
@@ -82,6 +86,7 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "ignoreOutdoorHumSensor": false,    // If true, do not load outdoor humidity sensors of thermostats found in Daikin account.
     "ignoreOutdoorTemp": false,         // If true, do not load outdoor temperature data of thermostats found in Daiking account.
     "enableAwaySwitch": false,          // If true, enable switch accessory to get/set the Away state of thermostats found in Daikin account.
+    "enableStateSwitches": false,         // If true, enable switch accessories that indicate the current running state of thermostats found in Daikin account.
     "autoResumeSchedule": false,        // If true, enable schedule after Away switch is toggled off.
     "enableEmergencyHeatSwitch": false, // If true, enable switch accessory to request auxiliary/emergency heat only.
     "enableOneCleanFan": false,         // If true, enable fan accessory that allows the user to run one clean.

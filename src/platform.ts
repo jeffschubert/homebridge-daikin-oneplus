@@ -6,11 +6,12 @@ import { DaikinOnePlusAQSensor } from './platformAQI.js';
 import { DaikinOnePlusHumidity } from './platformHumidity.js';
 import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch.js';
 import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch.js';
+import { DaikinOnePlusStateSwitch } from './platformStateSwitch.js';
 import { DaikinApi } from './daikinapi.js';
 import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch.js';
 import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan.js';
 import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
-import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions } from './types.js';
+import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions, EquipmentStatus } from './types.js';
 import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
 import assert from 'node:assert';
 
@@ -63,6 +64,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       enableCirculateAirFan: !!config.enableCirculateAirFan,
       enableScheduleSwitch: !!config.enableScheduleSwitch,
       enableAwaySwitch: !!config.enableAwaySwitch,
+      enableStateSwitches: !!config.enableStateSwitches,
       ignoreIndoorAqi: !!config.ignoreIndoorAqi,
       ignoreOutdoorAqi: !!config.ignoreOutdoorAqi,
       ignoreIndoorHumSensor: !!config.ignoreIndoorHumSensor,
@@ -156,6 +158,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.discoverIndoorAqi(device, deviceData);
       this.discoverScheduleSwitch(device);
       this.discoverAwaySwitch(device);
+      this.discoverStateSwitches(device);
       this.discoverEmergencyHeatSwitch(device);
       this.discoverOneCleanFan(device);
       this.discoverCirculateAirFan(device);
@@ -305,6 +308,16 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.log.debug('Removing Away switch from cache:', existingAccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
+  }
+
+  private discoverStateSwitches(device: Thermostat) {
+    this.log.debug('Checking for System State Switches...');
+
+    this.discoverStateSwitch(device, EquipmentStatus.HEATING, 'Heating');
+    this.discoverStateSwitch(device, EquipmentStatus.COOLING, 'Cooling');
+    this.discoverStateSwitch(device, EquipmentStatus.FAN, 'Fan');
+    this.discoverStateSwitch(device, EquipmentStatus.OVERCOOL_DEHUMIDIFYING, 'Overcool');
+    this.discoverStateSwitch(device, EquipmentStatus.IDLE, 'Idle');
   }
 
   private discoverIndoorAqi(device: Thermostat, deviceData: ThermostatData | undefined) {
@@ -483,6 +496,35 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     } else if (existingaccessory) {
       this.log.debug('removing Outdoor Temperature from cache:', existingaccessory.displayName);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingaccessory]);
+    }
+  }
+
+  private discoverStateSwitch(device: Thermostat, state: EquipmentStatus, name: string) {
+    const uuid = this.api.hap.uuid.generate(`${device.id}_${name}_state`);
+    this.log.debug(`Checking for system ${name} state switch...`);
+    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+
+    if (this.config.enableStateSwitches) {
+      const dName = this.accessoryName(device, name);
+      if (existingAccessory) {
+        // the accessory already exists
+        existingAccessory.displayName = dName;
+        existingAccessory.context.device = device;
+        this.log.debug(`Restoring existing system ${name} state switch from cache:`, existingAccessory.displayName);
+        new DaikinOnePlusStateSwitch(this, existingAccessory, device.id, this.daikinApi, state);
+      } else {
+        // the accessory does not yet exist, so we need to create it
+        this.log.debug(`Adding new system ${name} state switch:`, dName);
+
+        const accessory = new this.api.platformAccessory(dName, uuid);
+        accessory.context.device = device;
+        new DaikinOnePlusStateSwitch(this, accessory, device.id, this.daikinApi, state);
+        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      }
+    } else if (existingAccessory) {
+      //Delete any existing state switch
+      this.log.debug(`Removing system ${name} switch from cache:`, existingAccessory.displayName);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
     }
   }
 

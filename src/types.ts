@@ -254,6 +254,7 @@ export interface DaikinOptions {
   enableCirculateAirFan: boolean;
   enableScheduleSwitch: boolean;
   enableAwaySwitch: boolean;
+  enableStateSwitches: boolean;
   ignoreIndoorAqi: boolean;
   ignoreOutdoorAqi: boolean;
   ignoreIndoorHumSensor: boolean;

@@ -89,6 +89,12 @@
         "type": "boolean",
         "default": false
       },
+      "enableStateSwitches": {
+        "title": "Enable System State Switches",
+        "description": "Enable read-only switches for each potential running state of thermostats found in Daikin account. Can be used to trigger automations when the thermostat changes to a particular state.",
+        "type": "boolean",
+        "default": false
+      },
       "enableEmergencyHeatSwitch": {
         "title": "Enable Emergency Heat Switch",
         "description": "Enable switch to request auxiliary/emergency heat only",
@@ -162,6 +168,7 @@
       "items": [
         "enableScheduleSwitch",
         "enableAwaySwitch",
+        "enableStateSwitches",
         "autoResumeSchedule",
         "enableEmergencyHeatSwitch",
         "enableOneCleanFan",
