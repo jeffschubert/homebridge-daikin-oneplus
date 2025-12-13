@@ -47,6 +47,13 @@
   * Version 3 
     * Minimum node version increased to 14
     * Plugin is now verified!
+  * Version 4
+    * Minimum homebridge version increased to 1.8
+    * Minimum node version increased to 18
+    * Add System State option
+    * Add Device Data Logging option
+    * Better support for multiple thermostats
+    * Bug fixes and code quality improvements
 
 
 ## Known Issue
@@ -101,4 +108,4 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
 ## Acknowledgements
 The Daikin API requests and parsing of the results is based on the [daikinskyport](https://github.com/apetrycki/daikinskyport) repo by apetrycki.
 
-Many thanks to [Fabian Frank](https://github.com/FabianFrank) for his valued contributions towards performance improvements and other bug fixes.
+Many thanks to [Fabian Frank](https://github.com/FabianFrank) for his valued contributions throughout the project.
