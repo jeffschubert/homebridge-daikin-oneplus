@@ -1,4 +1,5 @@
 import { API, APIEvent, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
+import fakegato from 'fakegato-history';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { DaikinOnePlusThermostat } from './platformThermostat.js';
@@ -29,6 +30,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
+  public readonly FakeGatoHistoryService: ReturnType<typeof fakegato>;
 
   private readonly daikinApi: DaikinApi;
   private discoverTimer: NodeJS.Timeout | undefined;
@@ -40,6 +42,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug = this.debug.bind(this);
     this.Service = this.api.hap.Service;
     this.Characteristic = this.api.hap.Characteristic;
+    this.FakeGatoHistoryService = fakegato(this.api);
 
     //Don't start if not configured
     if (!config) {

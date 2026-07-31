@@ -36,6 +36,9 @@
     "one+",
     "oneplus"
   ],
+  "dependencies": {
+    "fakegato-history": "^0.6.7"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/node": "^20.18.0",
