@@ -10,6 +10,7 @@ import {
   TemperatureUnit,
   ThermostatMode,
 } from './types.js';
+import { HistoryStore } from './historyStore.js';
 
 /**
  * Token response from the Daikin authentication API.
@@ -63,6 +64,7 @@ export class DaikinApi {
   private password: string;
   private log: Logging;
   private logRaw: boolean;
+  private historyStore: HistoryStore;
 
   // Pending thresholds per device for AUTO mode. HomeKit sends heat and cool thresholds
   // separately, but the Daikin API requires both in a single request.
@@ -72,11 +74,17 @@ export class DaikinApi {
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
   private _emergencyHeatEnabled: Map<string, boolean> = new Map();
 
-  public constructor(user: string, password: string, log: Logging, logRaw: boolean) {
+  public constructor(
+    user: string, 
+    password: string, 
+    log: Logging, 
+    logRaw: boolean,
+    historyStore: HistoryStore) {
     this.log = log;
     this.user = user;
     this.password = password;
     this.logRaw = logRaw;
+    this.historyStore = historyStore;
   }
 
   public addListener(deviceId: string, listener: DataChanged) {
@@ -156,6 +164,8 @@ export class DaikinApi {
       this._updateCache(device.id, data);
       this.log.debug('Notifying listeners for device %s', device.id);
       this.notifyListeners(device.id);
+      this.log.debug('Recording history for device %s', device.id);
+      void this.historyStore.record(device.id, data, this.getTargetTempFromData(data));
     }
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
@@ -391,7 +401,7 @@ export class DaikinApi {
   public getCurrentTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempIndoor ?? -270;
   }
-
+  
   public getOutdoorTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempOutdoor ?? -270;
   }
@@ -415,6 +425,10 @@ export class DaikinApi {
 
   public getTargetTemp(deviceId: string): number {
     const data = this._devices.get(deviceId)?.data;
+    return this.getTargetTempFromData(data);
+  }
+
+  private getTargetTempFromData(data: ThermostatData | undefined): number {
     if (!data) return -270;
     switch (data.mode) {
       case ThermostatMode.HEAT:

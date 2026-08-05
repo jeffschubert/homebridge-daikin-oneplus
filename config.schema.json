@@ -124,6 +124,36 @@
         "type": "boolean",
         "description": "Enables logging of raw device data from Daikin API. Debug logging must also be enabled. Defaults to false. <br>WARNING: May include sensitive or identifying information. Review before sharing. Will also significantly increase log size.",
         "default": false
+      },
+      "enableHistory": {
+        "title": "Enable History Data",
+        "type": "boolean",
+        "description": "Enables recording of thermostat data to a local file for historical analysis. Defaults to false.",
+        "default": false
+      },
+      "storagePath": {
+        "title": "Storage Path",
+        "type": "string",
+        "description": "Path to store history data. Defaults to Homebridge storage path. History data will be stored in daily files within a subdirectory named 'daikin-oneplus-history'.",
+        "default": ""
+      },
+      "retentionDays": {
+        "title": "Retention Days",
+        "type": "number",
+        "description": "Number of days to retain history data. Defaults to 7.",
+        "default": 7
+      },
+      "recordRawData": {
+        "title": "Record Raw Data",
+        "type": "boolean",
+        "description": "If enabled, the raw data from the Daikin API will be recorded in the history data files and sent to any enabled consumers. Defaults to false.<br>WARNING: May include sensitive or identifying information. Review before sharing. Will also significantly increase log or historical data file size.",
+        "default": false
+      },
+      "rawDataFields": {
+        "title": "Raw Data Fields",
+        "type": "string",
+        "description": "If Record Raw Data is enabled, this specifies which fields of the raw data to record. If empty, all fields will be recorded.",
+        "default": ""
       }
     }
   },
@@ -173,6 +203,19 @@
         "enableEmergencyHeatSwitch",
         "enableOneCleanFan",
         "enableCirculateAirFan"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "History Data",
+      "expandable": true,
+      "expanded": false,
+      "items": [
+        "enableHistory",
+        "storagePath",
+        "retentionDays",
+        "recordRawData",
+        "rawDataFields"
       ]
     },
     {
