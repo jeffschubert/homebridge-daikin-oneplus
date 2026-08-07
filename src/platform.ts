@@ -95,13 +95,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.debug('Using Include Device Name setting of %s.', this.config.includeDeviceName);
     this.debug('Finished initializing platform: %s', this.config.name);
 
-    this.historyStore = new HistoryStore(this.log, {
-      enableHistory: this.config.enableHistory,
-      storagePath: this.config.storagePath,
-      retentionDays: (this.config.retentionDays as number) ?? 7,
-      recordRawData: this.config.recordRawData,
-      rawDataFields: this.config.rawDataFields,
-    });
+    this.historyStore = new HistoryStore(this.log, this.config);
 
     this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw, this.historyStore);
 
@@ -139,19 +133,10 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         this.discover();
       }
     }, 10 * 1000);
-
-    //daily prune of old history entries
-    this.pruneTimer = setInterval(() => {
-      void this.historyStore.pruneOldEntries();
-    }, 24 * 60 * 60 * 1000);
-
   }
 
   public shutdown(){
-    if (this.pruneTimer) {
-      clearInterval(this.pruneTimer);
-    }
-    this.historyStore.destroy();
+    void this.historyStore.destroy();
   }
   /**
    * This function is invoked when homebridge restores cached accessories from disk at startup.

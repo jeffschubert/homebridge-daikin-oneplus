@@ -291,15 +291,8 @@ export interface ThermostatReading {
 }
 
 export interface HistoryConsumer {
-    /** Called every time a new reading is captured. */
-    onReading(reading: ThermostatReading): void | Promise<void>;
+  /** Called every time a new reading is captured. */
+  onReading(reading: ThermostatReading): void | Promise<void>;
+  /** Optional cleanup hook, called when the platform shuts down. */
+  destroy?(): void | Promise<void>;
 }
-
-export interface HistoryStoreOptions {
-    enableHistory: boolean; // default false
-    storagePath: string; // e.g. api.user.storagePath()
-    retentionDays?: number; // default 7
-    recordRawData?: boolean; // default false
-    rawDataFields?: string; // default ""
-}
-
