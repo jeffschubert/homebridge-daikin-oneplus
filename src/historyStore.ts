@@ -18,6 +18,9 @@ export class HistoryStore {
   private consumers: HistoryConsumer[] = [];
   private buffer: Map<string, ThermostatReading[]> = new Map();
   private flushTimer?: NodeJS.Timeout;
+  private readonly rawDataFieldList: string[] | null; // null = record everything present
+  private readonly warnedMissingFields = new Set<string>();
+
 
   public constructor(
     private readonly log: Logging,
@@ -28,6 +31,8 @@ export class HistoryStore {
     this.retentionDays = options.retentionDays ?? 7;
     this.recordRawData = options.recordRawData ?? false;
     this.rawDataFields = options.rawDataFields ?? "";
+    const requested = this.rawDataFields.split(',').map((f) => f.trim()).filter(Boolean);
+    this.rawDataFieldList = requested.length > 0 ? requested : null;
 
     if(!this.enableHistory){
       this.log.info('HistoryStore is disabled. No readings will be persisted.');
@@ -79,10 +84,47 @@ export class HistoryStore {
       modeName: ThermostatMode[(data.mode ?? ThermostatMode.OFF)],
       state: (data.equipmentStatus ?? EquipmentStatus.IDLE).toString(),
       stateName: EquipmentStatus[(data.equipmentStatus ?? EquipmentStatus.IDLE)],
-      allData: this.recordRawData ? data : undefined,
+      allData: this.recordRawData ? this.filterRawData(data) : undefined,
     };
   }
 
+  private filterRawData(data: ThermostatData): Record<string, unknown> {
+    const rawData = data as unknown as Record<string, unknown>; // ThermostatData is a partial view; the real object may have more fields at runtime
+
+    if (!this.rawDataFieldList) {
+      return this.sortedCopy(rawData); // no filter configured — record everything present
+    }
+
+    const filtered: Record<string, unknown> = {};
+    const missingFields: string[] = [];
+
+    for (const field of this.rawDataFieldList) {
+      if (field in rawData) {
+        filtered[field] = rawData[field];
+      } else if (!this.warnedMissingFields.has(field)) {
+        missingFields.push(field);
+        this.warnedMissingFields.add(field); // log once per field name, not every poll cycle
+      }
+    }
+    
+    if(missingFields.length > 0){
+      this.log.warn(
+        'rawDataFields: the following field(s) were not found in this reading: %s. This may be normal if your ' +
+        'thermostat model doesn\'t report these fields, or they only appear under certain conditions.',
+        missingFields.join(', '),
+      );
+    }
+    return this.sortedCopy(filtered);
+  }
+
+  private sortedCopy(obj: Record<string, unknown>): Record<string, unknown> {
+    const sorted: Record<string, unknown> = {};
+    for (const key of Object.keys(obj).sort()) {
+      sorted[key] = obj[key];
+    }
+    return sorted;
+  }
+  
   /** e.g. 1722643200000 -> "2024-08-02" (UTC) */
   private dayKeyFor(timestamp: number): string {
     return new Date(timestamp).toISOString().slice(0, 10);

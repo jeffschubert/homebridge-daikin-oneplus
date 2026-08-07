@@ -287,7 +287,7 @@ export interface ThermostatReading {
     state?: string; // see EquipmentStatus enum
     stateName?: string;
     setpoint?: number;
-    allData: ThermostatData | undefined; // optional, only present if logRaw is enabled
+    allData: Record<string, unknown> | undefined; // optional, only present if recordRawData is enabled. Also, arbitrary/undocumented fields, not just ThermostatData's known subset. 
 }
 
 export interface HistoryConsumer {
@@ -298,7 +298,7 @@ export interface HistoryConsumer {
 export interface HistoryStoreOptions {
     enableHistory: boolean; // default false
     storagePath: string; // e.g. api.user.storagePath()
-    retentionDays?: number; // default 0 (off)
+    retentionDays?: number; // default 7
     recordRawData?: boolean; // default false
     rawDataFields?: string; // default ""
 }
