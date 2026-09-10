@@ -38,7 +38,8 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
 
     const flushIntervalMs = 60_000;
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
-    this.pruneTimer = setInterval(() => void this.pruneOldEntries(), 24 * 60 * 60 * 1000);
+    this.pruneTimer = setInterval(() => void this.pruneOldEntries(), 60 * 60 * 1000);
+    void this.pruneOldEntries(); // catch up on anything stale from while we were down
   }
 
   public onReading(reading: ThermostatReading): void {
@@ -135,9 +136,16 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
     return all.filter((r) => r.deviceId === deviceId);
   }
 
-  /** Deletes whole day-files older than retentionDays — no read/rewrite needed. */
+  /**
+   * Deletes whole day-files outside the retention window — no read/rewrite needed.
+   * retentionDays counts calendar days inclusive of today, so 1 keeps only today's
+   * file, 7 keeps today plus the previous 6 days.
+   */
   public async pruneOldEntries(): Promise<void> {
-    const cutoffKey = this.dayKeyFor(Date.now() - this.retentionDays * 24 * 60 * 60 * 1000);
+    if (this.retentionDays <= 0) {
+      return; // disabled — e.g. after a persistent write failure
+    }
+    const cutoffKey = this.dayKeyFor(Date.now() - (this.retentionDays - 1) * 24 * 60 * 60 * 1000);
     let dayFiles: string[];
     try {
       dayFiles = await fs.readdir(this.historyDir);

@@ -158,8 +158,9 @@
       "retentionDays": {
         "title": "Retention Days",
         "type": "number",
-        "description": "Number of days to retain history data. Defaults to 7.",
+        "description": "Number of calendar days of history data to retain, counting today. 1 keeps only today's file; 7 keeps today plus the previous 6 days. Older daily files are deleted. Defaults to 7.",
         "default": 7,
+        "minimum": 1,
         "condition": {
           "functionBody": "return model.enableHistory === true"
         }
