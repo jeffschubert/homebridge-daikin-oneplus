@@ -14,6 +14,7 @@ import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
 import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions, EquipmentStatus } from './types.js';
 import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
 import assert from 'node:assert';
+import { HistoryStore } from './historyStore.js';
 
 /**
  * HomebridgePlatform
@@ -32,6 +33,9 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
   private readonly daikinApi: DaikinApi;
   private discoverTimer: NodeJS.Timeout | undefined;
+
+  public readonly historyStore: HistoryStore;
+  private pruneTimer: NodeJS.Timeout | undefined;
 
   public constructor(log: Logging, config: PlatformConfig, api: API) {
     this.accessories = [];
@@ -53,6 +57,10 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     assert(typeof config.name === 'string', 'No valid name configured.');
 
+    const configuredStoragePath = typeof config.storagePath === 'string' ? config.storagePath.trim() : '';
+
+    const storagePath = configuredStoragePath.length > 0 ? configuredStoragePath : api.user.storagePath();
+
     this.config = {
       debug: !!config.debug,
       user: config.user,
@@ -73,6 +81,11 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       ignoreOutdoorTemp: !!config.ignoreOutdoorTemp,
       autoResumeSchedule: !!config.autoResumeSchedule,
       logRaw: !!config.debug && !!config.logRaw,
+      enableHistory: !!config.enableHistory,
+      storagePath: storagePath,
+      retentionDays: config.retentionDays,
+      recordRawData: !!config.recordRawData,
+      rawDataFields: config.rawDataFields ?? '',
     };
 
     this.debug('Debug logging on. Expect lots of messages.');
@@ -80,13 +93,18 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.debug('Using Include Device Name setting of %s.', this.config.includeDeviceName);
     this.debug('Finished initializing platform: %s', this.config.name);
 
-    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw);
+    this.historyStore = new HistoryStore(this.log, this.config);
+
+    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw, this.historyStore);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
     this.api.on(APIEvent.DID_FINISH_LAUNCHING, this.discover.bind(this));
+
+    // When this event is fired it means Homebridge is shutting down and we should cleanup any resources, such as the history store timer.
+    this.api.on(APIEvent.SHUTDOWN, this.shutdown.bind(this));
   }
 
   private discover(): void {
@@ -115,6 +133,9 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }, 10 * 1000);
   }
 
+  public shutdown() {
+    void this.historyStore.destroy();
+  }
   /**
    * This function is invoked when homebridge restores cached accessories from disk at startup.
    * It should be used to setup event handlers for characteristics and update respective values.

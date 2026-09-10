@@ -2,7 +2,7 @@
  * Operating mode for the thermostat.
  * Maps to HomeKit's TargetHeatingCoolingState.
  */
-export const enum ThermostatMode {
+export enum ThermostatMode {
   OFF = 0,
   HEAT = 1,
   COOL = 2,
@@ -14,7 +14,7 @@ export const enum ThermostatMode {
  * Equipment running status.
  * Indicates what the HVAC system is currently doing.
  */
-export const enum EquipmentStatus {
+export enum EquipmentStatus {
   COOLING = 1,
   OVERCOOL_DEHUMIDIFYING = 2,
   HEATING = 3,
@@ -25,7 +25,7 @@ export const enum EquipmentStatus {
 /**
  * Fan circulation mode setting.
  */
-export const enum FanCirculateMode {
+export enum FanCirculateMode {
   OFF = 0,
   ALWAYS_ON = 1,
   SCHEDULE = 2,
@@ -34,7 +34,7 @@ export const enum FanCirculateMode {
 /**
  * Temperature display units.
  */
-export const enum TemperatureUnit {
+export enum TemperatureUnit {
   FAHRENHEIT = 0,
   CELSIUS = 1,
 }
@@ -42,7 +42,7 @@ export const enum TemperatureUnit {
 /**
  * Air quality level (0 = best, 3 = worst).
  */
-export const enum AirQualityLevel {
+export enum AirQualityLevel {
   GOOD = 0,
   FAIR = 1,
   INFERIOR = 2,
@@ -263,4 +263,36 @@ export interface DaikinOptions {
   ignoreOutdoorTemp: boolean;
   autoResumeSchedule: boolean;
   logRaw: boolean;
+  enableHistory: boolean;
+  storagePath: string;
+  retentionDays: number;
+  recordRawData: boolean;
+  rawDataFields: string;
+}
+
+/**
+ * A single normalized reading. Extend as needed, but keep it
+ * device-shape-agnostic — no HomeKit characteristic types here.
+ */
+
+export interface ThermostatReading {
+  timestamp: number; // ms since epoch
+  deviceId: string;
+  indoorTemperature?: number;
+  outdoorTemperature?: number;
+  indoorHumidity?: number;
+  outdoorHumidity?: number;
+  mode?: string; // see ThermostatMode enum
+  modeName?: string;
+  state?: string; // see EquipmentStatus enum
+  stateName?: string;
+  setpoint?: number;
+  allData: Record<string, unknown> | undefined; // optional, only present if recordRawData is enabled. Also, arbitrary/undocumented fields, not just ThermostatData's known subset.
+}
+
+export interface HistoryConsumer {
+  /** Called every time a new reading is captured. */
+  onReading(reading: ThermostatReading): void | Promise<void>;
+  /** Optional cleanup hook, called when the platform shuts down. */
+  destroy?(): void | Promise<void>;
 }
