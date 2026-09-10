@@ -678,8 +678,13 @@ export class DaikinApi {
       };
     } else {
       if (enableSchedule) {
+        //  schedOverride must be cleared here too. Clearing geofencingAway and
+        //  setting schedEnabled does NOT cancel an active manual or temp hold,
+        //  so without this the thermostat stays parked on the held setpoint
+        //  and never returns to the schedule the user just asked to resume.
         requestedData = {
           geofencingAway: false,
+          schedOverride: 0,
           schedEnabled: true,
         };
       } else {
