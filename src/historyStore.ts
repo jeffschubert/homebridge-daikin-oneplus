@@ -20,7 +20,10 @@ export class HistoryStore {
   ) {
     this.recordRawData = options.recordRawData ?? false;
     const rawDataFields = options.rawDataFields ?? '';
-    const requested = rawDataFields.split(',').map((f) => f.trim()).filter(Boolean);
+    const requested = rawDataFields
+      .split(',')
+      .map(f => f.trim())
+      .filter(Boolean);
     this.rawDataFieldList = requested.length > 0 ? requested : null;
 
     this.initConsumers();
@@ -32,7 +35,7 @@ export class HistoryStore {
         new JsonlFileHistoryConsumer(this.log, {
           storagePath: this.options.storagePath,
           retentionDays: (this.options.retentionDays as number) ?? 7,
-        })
+        }),
       );
     }
     // Future consumers (MQTT, InfluxDB, etc.) can be registered here.
@@ -68,9 +71,9 @@ export class HistoryStore {
       outdoorHumidity: data.humOutdoor,
       setpoint: setPoint,
       mode: (data.mode ?? ThermostatMode.OFF).toString(),
-      modeName: ThermostatMode[(data.mode ?? ThermostatMode.OFF)],
+      modeName: ThermostatMode[data.mode ?? ThermostatMode.OFF],
       state: (data.equipmentStatus ?? EquipmentStatus.IDLE).toString(),
-      stateName: EquipmentStatus[(data.equipmentStatus ?? EquipmentStatus.IDLE)],
+      stateName: EquipmentStatus[data.equipmentStatus ?? EquipmentStatus.IDLE],
       allData: this.recordRawData ? this.filterRawData(data) : undefined,
     };
   }
@@ -97,7 +100,7 @@ export class HistoryStore {
     if (missingFields.length > 0) {
       this.log.warn(
         'rawDataFields: the following field(s) were not found in this reading: %s. This may be normal if your ' +
-        'thermostat model doesn\'t report these fields, or they only appear under certain conditions.',
+          "thermostat model doesn't report these fields, or they only appear under certain conditions.",
         missingFields.join(', '),
       );
     }

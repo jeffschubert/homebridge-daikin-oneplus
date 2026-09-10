@@ -276,18 +276,18 @@ export interface DaikinOptions {
  */
 
 export interface ThermostatReading {
-    timestamp: number; // ms since epoch
-    deviceId: string;
-    indoorTemperature?: number;
-    outdoorTemperature?: number;
-    indoorHumidity?: number;
-    outdoorHumidity?: number;
-    mode?: string; // see ThermostatMode enum
-    modeName?: string;
-    state?: string; // see EquipmentStatus enum
-    stateName?: string;
-    setpoint?: number;
-    allData: Record<string, unknown> | undefined; // optional, only present if recordRawData is enabled. Also, arbitrary/undocumented fields, not just ThermostatData's known subset. 
+  timestamp: number; // ms since epoch
+  deviceId: string;
+  indoorTemperature?: number;
+  outdoorTemperature?: number;
+  indoorHumidity?: number;
+  outdoorHumidity?: number;
+  mode?: string; // see ThermostatMode enum
+  modeName?: string;
+  state?: string; // see EquipmentStatus enum
+  stateName?: string;
+  setpoint?: number;
+  allData: Record<string, unknown> | undefined; // optional, only present if recordRawData is enabled. Also, arbitrary/undocumented fields, not just ThermostatData's known subset.
 }
 
 export interface HistoryConsumer {

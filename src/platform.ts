@@ -57,11 +57,9 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     assert(typeof config.name === 'string', 'No valid name configured.');
 
-    const configuredStoragePath =
-      typeof config.storagePath === 'string' ? config.storagePath.trim() : '';
+    const configuredStoragePath = typeof config.storagePath === 'string' ? config.storagePath.trim() : '';
 
-    const storagePath =
-      configuredStoragePath.length > 0 ? configuredStoragePath : api.user.storagePath();
+    const storagePath = configuredStoragePath.length > 0 ? configuredStoragePath : api.user.storagePath();
 
     this.config = {
       debug: !!config.debug,
@@ -87,7 +85,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       storagePath: storagePath,
       retentionDays: config.retentionDays,
       recordRawData: !!config.recordRawData,
-      rawDataFields: config.rawDataFields ?? "",
+      rawDataFields: config.rawDataFields ?? '',
     };
 
     this.debug('Debug logging on. Expect lots of messages.');
@@ -135,7 +133,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }, 10 * 1000);
   }
 
-  public shutdown(){
+  public shutdown() {
     void this.historyStore.destroy();
   }
   /**

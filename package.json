@@ -27,7 +27,8 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "watch": "npm run build && npm link && nodemon",
     "build": "rimraf ./dist && tsc",
-    "prepublishOnly": "npm run lint && npm run build",
+    "verify": "npm run format:check && npm run lint && npm run build",
+    "prepublishOnly": "npm run verify",
     "debug": "npm run prepublishOnly && npm link && homebridge -D"
   },
   "keywords": [

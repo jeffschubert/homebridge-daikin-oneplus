@@ -74,12 +74,7 @@ export class DaikinApi {
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
   private _emergencyHeatEnabled: Map<string, boolean> = new Map();
 
-  public constructor(
-    user: string, 
-    password: string, 
-    log: Logging, 
-    logRaw: boolean,
-    historyStore: HistoryStore) {
+  public constructor(user: string, password: string, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
     this.log = log;
     this.user = user;
     this.password = password;
@@ -401,7 +396,7 @@ export class DaikinApi {
   public getCurrentTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempIndoor ?? -270;
   }
-  
+
   public getOutdoorTemp(deviceId: string): number {
     return this._devices.get(deviceId)?.data?.tempOutdoor ?? -270;
   }

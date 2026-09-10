@@ -31,10 +31,7 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
     this.historyDir = path.join(options.storagePath, 'daikin-oneplus-history');
     this.retentionDays = options.retentionDays ?? 7;
 
-    this.log.info(
-      'JsonlFileHistoryConsumer initialized with retentionDays=%d, storagePath=%s',
-      this.retentionDays, this.historyDir,
-    );
+    this.log.info('JsonlFileHistoryConsumer initialized with retentionDays=%d, storagePath=%s', this.retentionDays, this.historyDir);
 
     const flushIntervalMs = 60_000;
     this.flushTimer = setInterval(() => void this.flush(), flushIntervalMs);
@@ -80,7 +77,7 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
     this.buffer = new Map();
 
     for (const [dayKey, readings] of pending) {
-      const lines = readings.map((r) => JSON.stringify(r)).join('\n') + '\n';
+      const lines = readings.map(r => JSON.stringify(r)).join('\n') + '\n';
       try {
         await fs.appendFile(this.filePathForDay(dayKey), lines, 'utf8');
       } catch (err) {
@@ -105,8 +102,8 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
     const untilKey = this.dayKeyFor(until);
 
     const relevantFiles = dayFiles
-      .filter((f) => f.startsWith('history-') && f.endsWith('.jsonl'))
-      .filter((f) => {
+      .filter(f => f.startsWith('history-') && f.endsWith('.jsonl'))
+      .filter(f => {
         const dayKey = f.slice('history-'.length, -'.jsonl'.length);
         return dayKey >= sinceKey && dayKey <= untilKey;
       });
@@ -133,7 +130,7 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
 
   public async query(deviceId: string, since: number, until: number = Date.now()): Promise<ThermostatReading[]> {
     const all = await this.readRange(since, until);
-    return all.filter((r) => r.deviceId === deviceId);
+    return all.filter(r => r.deviceId === deviceId);
   }
 
   /**
