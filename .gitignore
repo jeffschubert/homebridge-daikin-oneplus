@@ -1,6 +1,9 @@
 # Ignore compiled code
 dist
 
+# Local dev helper script
+/dev.sh
+
 # ------------- Defaults ------------- #
 
 # Logs

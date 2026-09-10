@@ -54,6 +54,9 @@
     * Add Device Data Logging option
     * Better support for multiple thermostats
     * Bug fixes and code quality improvements
+  * Version 4.1
+    * Route device data to pluggable consumers, including a History File consumer that writes daily JSONL files (configurable path/retention)
+    * Optionally attach raw Daikin API data, filtered to chosen fields
 
 
 ## Known Issue

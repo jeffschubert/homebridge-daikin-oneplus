@@ -120,10 +120,25 @@
         "default": false
       },
       "logRaw": {
-        "title": "Device Data Logging",
+        "title": "Log Device Data",
         "type": "boolean",
         "description": "Enables logging of raw device data from Daikin API. Debug logging must also be enabled. Defaults to false. <br>WARNING: May include sensitive or identifying information. Review before sharing. Will also significantly increase log size.",
         "default": false
+      },
+      "recordRawData": {
+        "title": "Record Raw Data",
+        "type": "boolean",
+        "description": "If enabled, the raw data from the Daikin API will be sent to any enabled consumers alongside the default data. Defaults to false.<br>WARNING: May include sensitive or identifying information. Review before sharing. Could significantly increase file sizes or data sent to consumers.",
+        "default": false
+      },
+      "rawDataFields": {
+        "title": "Raw Data Fields",
+        "type": "string",
+        "description": "If Record Raw Data is enabled, this specifies which fields of the raw data to record, as a comma-separated list of field names (e.g. 'ctIndoorTemperature,fanCirculateSpeed'). If empty, all fields will be recorded.",
+        "default": "",
+        "condition": {
+          "functionBody": "return model.recordRawData === true"
+        }
       },
       "enableHistory": {
         "title": "Enable History Data",
@@ -135,25 +150,19 @@
         "title": "Storage Path",
         "type": "string",
         "description": "Path to store history data. Defaults to Homebridge storage path. History data will be stored in daily files within a subdirectory named 'daikin-oneplus-history'.",
-        "default": ""
+        "default": "",
+        "condition": {
+          "functionBody": "return model.enableHistory === true"
+        }
       },
       "retentionDays": {
         "title": "Retention Days",
         "type": "number",
         "description": "Number of days to retain history data. Defaults to 7.",
-        "default": 7
-      },
-      "recordRawData": {
-        "title": "Record Raw Data",
-        "type": "boolean",
-        "description": "If enabled, the raw data from the Daikin API will be recorded in the history data files and sent to any enabled consumers. Defaults to false.<br>WARNING: May include sensitive or identifying information. Review before sharing. Will also significantly increase log or historical data file size.",
-        "default": false
-      },
-      "rawDataFields": {
-        "title": "Raw Data Fields",
-        "type": "string",
-        "description": "If Record Raw Data is enabled, this specifies which fields of the raw data to record. If empty, all fields will be recorded.",
-        "default": ""
+        "default": 7,
+        "condition": {
+          "functionBody": "return model.enableHistory === true"
+        }
       }
     }
   },
@@ -207,7 +216,7 @@
     },
     {
       "type": "section",
-      "title": "History Data",
+      "title": "History & Data Export",
       "expandable": true,
       "expanded": false,
       "items": [
