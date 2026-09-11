@@ -35,6 +35,7 @@ export class HistoryStore {
         new JsonlFileHistoryConsumer(this.log, {
           storagePath: this.options.storagePath,
           retentionDays: (this.options.retentionDays as number) ?? 7,
+          compressHistoryFiles: this.options.compressHistoryFiles ?? true,
         }),
       );
     }

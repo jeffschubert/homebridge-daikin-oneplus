@@ -84,6 +84,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       enableHistory: !!config.enableHistory,
       storagePath: storagePath,
       retentionDays: config.retentionDays,
+      compressHistoryFiles: config.compressHistoryFiles === undefined ? true : !!config.compressHistoryFiles,
       recordRawData: !!config.recordRawData,
       rawDataFields: config.rawDataFields ?? '',
     };
