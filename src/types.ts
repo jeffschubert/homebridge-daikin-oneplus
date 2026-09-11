@@ -1,3 +1,5 @@
+import type { PlatformAccessory } from 'homebridge';
+
 /**
  * Operating mode for the thermostat.
  * Maps to HomeKit's TargetHeatingCoolingState.
@@ -269,6 +271,7 @@ export interface DaikinOptions {
   compressHistoryFiles: boolean;
   recordRawData: boolean;
   rawDataFields: string;
+  enableEveHistory: boolean;
 }
 
 /**
@@ -294,6 +297,14 @@ export interface ThermostatReading {
 export interface HistoryConsumer {
   /** Called every time a new reading is captured. */
   onReading(reading: ThermostatReading): void | Promise<void>;
+  /**
+   * Optional hook called once a device's accessory has been created or
+   * restored from cache. Only consumers that need to attach something to
+   * the accessory itself (e.g. an Eve history service) need to implement
+   * this — it may be called more than once for the same deviceId across
+   * rediscovery/cache restores, so implementations must be idempotent.
+   */
+  onAccessoryRegistered?(deviceId: string, accessory: PlatformAccessory<AccessoryContext>): void;
   /** Optional cleanup hook, called when the platform shuts down. */
   destroy?(): void | Promise<void>;
 }

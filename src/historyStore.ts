@@ -1,6 +1,15 @@
-import type { Logging } from 'homebridge';
-import { EquipmentStatus, HistoryConsumer, DaikinOptions, ThermostatData, ThermostatMode, ThermostatReading } from './types.js';
+import type { API, Logging, PlatformAccessory } from 'homebridge';
+import {
+  AccessoryContext,
+  EquipmentStatus,
+  HistoryConsumer,
+  DaikinOptions,
+  ThermostatData,
+  ThermostatMode,
+  ThermostatReading,
+} from './types.js';
 import { JsonlFileHistoryConsumer } from './jsonlFileHistoryConsumer.js';
+import { FakeGatoHistoryConsumer } from './fakeGatoHistoryConsumer.js';
 
 /**
  * Captures readings independent of any single consumer (files, Eve, MQTT...).
@@ -16,6 +25,7 @@ export class HistoryStore {
 
   public constructor(
     private readonly log: Logging,
+    private readonly api: API,
     private readonly options: DaikinOptions,
   ) {
     this.recordRawData = options.recordRawData ?? false;
@@ -39,11 +49,30 @@ export class HistoryStore {
         }),
       );
     }
+    if (this.options.enableEveHistory) {
+      this.registerConsumer(new FakeGatoHistoryConsumer(this.log, this.api));
+    }
     // Future consumers (MQTT, InfluxDB, etc.) can be registered here.
   }
 
   public registerConsumer(consumer: HistoryConsumer): void {
     this.consumers.push(consumer);
+  }
+
+  /**
+   * Called once a device's accessory has been created or restored from
+   * cache, so accessory-aware consumers (e.g. Eve history) can attach
+   * themselves to it. Safe to call more than once for the same deviceId —
+   * consumers are expected to no-op on repeat registrations.
+   */
+  public registerAccessory(deviceId: string, accessory: PlatformAccessory<AccessoryContext>): void {
+    for (const consumer of this.consumers) {
+      try {
+        consumer.onAccessoryRegistered?.(deviceId, accessory);
+      } catch (err) {
+        this.log.warn('History consumer failed to register accessory:', err);
+      }
+    }
   }
 
   public async record(deviceId: string, data: ThermostatData, setPoint: number): Promise<void> {
