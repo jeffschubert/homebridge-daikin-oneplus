@@ -117,10 +117,14 @@ export class JsonlFileHistoryConsumer implements HistoryConsumer {
     }
   }
 
-  /** Runs the periodic upkeep: compress finished days, then prune whatever falls outside retention. */
+  /**
+   * Runs the periodic upkeep: prune first so anything already outside the
+   * retention window is deleted before we'd otherwise waste time compressing
+   * it, then compress whatever finished days remain.
+   */
   private async runMaintenance(): Promise<void> {
-    await this.compressCompletedDays();
     await this.pruneOldEntries();
+    await this.compressCompletedDays();
   }
 
   /**
