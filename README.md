@@ -57,6 +57,8 @@
   * Version 4.1
     * Route device data to pluggable consumers, including a History File consumer that writes daily JSONL files (configurable path/retention)
     * Optionally attach raw Daikin API data, filtered to chosen fields
+  * Version 4.1.1
+    * History files are now gzip-compressed once their day ends, to reduce disk usage (enabled by default; configurable via Compress History Files)
 
 
 ## Known Issue

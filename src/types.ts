@@ -266,6 +266,7 @@ export interface DaikinOptions {
   enableHistory: boolean;
   storagePath: string;
   retentionDays: number;
+  compressHistoryFiles: boolean;
   recordRawData: boolean;
   rawDataFields: string;
 }

@@ -164,6 +164,15 @@
         "condition": {
           "functionBody": "return model.enableHistory === true"
         }
+      },
+      "compressHistoryFiles": {
+        "title": "Compress History Files",
+        "type": "boolean",
+        "description": "Compress each daily history file with gzip once its day has ended, to reduce disk usage. The current day's file is always kept uncompressed while it's being written. Defaults to true.",
+        "default": true,
+        "condition": {
+          "functionBody": "return model.enableHistory === true"
+        }
       }
     }
   },
@@ -224,6 +233,7 @@
         "enableHistory",
         "storagePath",
         "retentionDays",
+        "compressHistoryFiles",
         "recordRawData",
         "rawDataFields"
       ]
