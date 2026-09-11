@@ -87,6 +87,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       compressHistoryFiles: config.compressHistoryFiles === undefined ? true : !!config.compressHistoryFiles,
       recordRawData: !!config.recordRawData,
       rawDataFields: config.rawDataFields ?? '',
+      enableEveHistory: !!config.enableEveHistory,
     };
 
     this.debug('Debug logging on. Expect lots of messages.');
@@ -94,7 +95,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.debug('Using Include Device Name setting of %s.', this.config.includeDeviceName);
     this.debug('Finished initializing platform: %s', this.config.name);
 
-    this.historyStore = new HistoryStore(this.log, this.config);
+    this.historyStore = new HistoryStore(this.log, this.api, this.config);
 
     this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw, this.historyStore);
 
@@ -479,6 +480,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         existingAccessory.context.device = device;
         this.log.debug('Restoring existing thermostat from cache:', existingAccessory.displayName);
         new DaikinOnePlusThermostat(this, existingAccessory, device.id, this.daikinApi);
+        this.historyStore.registerAccessory(device.id, existingAccessory);
       } else {
         // the accessory does not yet exist, so we need to create it
         this.log.debug('Adding new thermostat:', dName);
@@ -486,6 +488,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
         const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
         accessory.context.device = device;
         new DaikinOnePlusThermostat(this, accessory, device.id, this.daikinApi);
+        this.historyStore.registerAccessory(device.id, accessory);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     } else if (existingAccessory) {

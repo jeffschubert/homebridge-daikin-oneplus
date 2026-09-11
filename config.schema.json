@@ -140,6 +140,12 @@
           "functionBody": "return model.recordRawData === true"
         }
       },
+      "enableEveHistory": {
+        "title": "Enable Eve App History",
+        "type": "boolean",
+        "description": "Enables temperature, setpoint, and valve position history for thermostats in the Eve app (requires the Eve for HomeKit app; not visible in the standard Home app). Defaults to false.",
+        "default": false
+      },
       "enableHistory": {
         "title": "Enable History Data",
         "type": "boolean",
@@ -230,6 +236,7 @@
       "expandable": true,
       "expanded": false,
       "items": [
+        "enableEveHistory",
         "enableHistory",
         "storagePath",
         "retentionDays",
