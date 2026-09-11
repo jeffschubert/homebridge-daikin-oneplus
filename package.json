@@ -42,7 +42,7 @@
     "@types/node": "^20.18.0",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
-    "eslint": "^9.39.1",
+    "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-promise": "^7.2.1",
     "globals": "^16.5.0",
