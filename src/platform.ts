@@ -175,8 +175,8 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
       this.discoverThermostat(device);
       this.discoverOutdoorTemp(device);
-      this.discoverOutdoorHumSensor(device);
-      this.discoverIndoorHumSensor(device);
+      this.discoverOutdoorHumSensor(device, deviceData);
+      this.discoverIndoorHumSensor(device, deviceData);
       this.discoverOutdoorAqi(device, deviceData);
       this.discoverIndoorAqi(device, deviceData);
       this.discoverScheduleSwitch(device);
@@ -411,26 +411,31 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private discoverIndoorHumSensor(device: Thermostat) {
+  private discoverIndoorHumSensor(device: Thermostat, deviceData: ThermostatData | undefined) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_ihum`);
     this.log.debug('Checking for indoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
     if (!this.config.ignoreIndoorHumSensor) {
       const dName = this.accessoryName(device, 'Indoor Humidity');
-      if (existingAccessory) {
-        // the accessory already exists
-        existingAccessory.displayName = dName;
-        existingAccessory.context.device = device;
-        this.log.debug('Restoring existing indoor humidity sensor from cache:', existingAccessory.displayName);
-        new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, true);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.debug('Adding new indoor humidity sensor:', dName);
+      if (deviceData && deviceData.humIndoor !== undefined) {
+        if (existingAccessory) {
+          // the accessory already exists
+          existingAccessory.displayName = dName;
+          existingAccessory.context.device = device;
+          this.log.debug('Restoring existing indoor humidity sensor from cache:', existingAccessory.displayName);
+          new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, true);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.debug('Adding new indoor humidity sensor:', dName);
 
-        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
-        accessory.context.device = device;
-        new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, true);
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
+          accessory.context.device = device;
+          new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, true);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      } else if (existingAccessory) {
+        this.log.debug('Device does not report indoor humidity. Removing sensor from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
     } else if (existingAccessory) {
       //Delete any existing Indoor Humidity sensor
@@ -439,27 +444,32 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 
-  private discoverOutdoorHumSensor(device: Thermostat) {
+  private discoverOutdoorHumSensor(device: Thermostat, deviceData: ThermostatData | undefined) {
     const uuid = this.api.hap.uuid.generate(`${device.id}_ohum`);
     this.log.debug('Checking for outdoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
     if (!this.config.ignoreOutdoorHumSensor) {
       const dName = this.accessoryName(device, 'Outdoor Humidity');
-      if (existingAccessory) {
-        // the accessory already exists
-        existingAccessory.displayName = dName;
-        existingAccessory.context.device = device;
-        this.log.debug('Restoring existing outdoor humidity sensor from cache:', existingAccessory.displayName);
-        new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, false);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.debug('Adding new outdoor humidity sensor:', dName);
+      if (deviceData && deviceData.humOutdoor !== undefined) {
+        if (existingAccessory) {
+          // the accessory already exists
+          existingAccessory.displayName = dName;
+          existingAccessory.context.device = device;
+          this.log.debug('Restoring existing outdoor humidity sensor from cache:', existingAccessory.displayName);
+          new DaikinOnePlusHumidity(this, existingAccessory, device.id, this.daikinApi, false);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.debug('Adding new outdoor humidity sensor:', dName);
 
-        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
-        accessory.context.device = device;
-        new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, false);
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
+          accessory.context.device = device;
+          new DaikinOnePlusHumidity(this, accessory, device.id, this.daikinApi, false);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      } else if (existingAccessory) {
+        this.log.debug('Device does not report outdoor humidity. Removing sensor from cache:', existingAccessory.displayName);
+        this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
     } else if (existingAccessory) {
       //Delete any existing Outdoor Humidity sensor

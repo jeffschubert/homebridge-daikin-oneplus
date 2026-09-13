@@ -11,6 +11,7 @@ import {
   ThermostatMode,
 } from './types.js';
 import { HistoryStore } from './historyStore.js';
+import { describeMiniSplit, isMiniSplitData, normalizeMiniSplitData, toMiniSplitUpdate } from './miniSplit.js';
 
 /**
  * Token response from the Daikin authentication API.
@@ -86,6 +87,9 @@ export class DaikinApi {
 
   // Devices whose data shape isn't recognized. Warned about once, then skipped.
   private _unsupportedDevices: Set<string> = new Set();
+
+  // Devices that speak the mini split payload and need translation on read and write.
+  private _miniSplits: Set<string> = new Set();
 
   public constructor(user: string, password: string, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
     this.log = log;
@@ -338,7 +342,12 @@ export class DaikinApi {
   }
 
   public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
-    return await this.getRequest(getDeviceUrl(deviceId));
+    const data: ThermostatData | undefined = await this.getRequest(getDeviceUrl(deviceId));
+    if (data && isMiniSplitData(data)) {
+      this._miniSplits.add(deviceId);
+      return normalizeMiniSplitData(data);
+    }
+    return data;
   }
 
   /**
@@ -348,6 +357,9 @@ export class DaikinApi {
   public describeDevice(data: ThermostatData | undefined): string {
     if (!data) {
       return 'no data available';
+    }
+    if (isMiniSplitData(data)) {
+      return describeMiniSplit(data);
     }
     const parts: string[] = [];
     const thermostat = readIdField(data.statModel);
@@ -769,8 +781,32 @@ export class DaikinApi {
     return this.putRequest(deviceId, requestedData, 'setAwayState', 'Error updating away state:');
   }
 
+  /**
+   * The body to PUT for a write. One+ thermostats take the plugin's fields as-is; mini splits
+   * need them translated, and can't honor every write. Returns undefined if nothing is left to send.
+   */
+  private _toApiPayload(deviceId: string, requestData: ThermostatUpdate, caller: string): object | undefined {
+    if (!this._miniSplits.has(deviceId)) {
+      return requestData;
+    }
+
+    const { data, unsupported } = toMiniSplitUpdate(requestData);
+    if (Object.keys(data).length === 0) {
+      this.log.info('Mini split %s has no equivalent for %s. Ignoring.', deviceId, caller);
+      return undefined;
+    }
+    if (unsupported.length > 0) {
+      this.log.info('Mini split %s does not support %s. Ignoring that part of %s.', deviceId, unsupported.join(', '), caller);
+    }
+    return data;
+  }
+
   private async putRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
-    this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
+    const body = this._toApiPayload(deviceId, requestData, caller);
+    if (!body) {
+      return false;
+    }
+    this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(body));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
     this._lastWriteFinishTimeMs = -1;
     this.log.debug(
@@ -795,7 +831,7 @@ export class DaikinApi {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
         },
-        body: JSON.stringify(requestData),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
