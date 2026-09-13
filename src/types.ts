@@ -198,6 +198,17 @@ export interface ThermostatData {
   /** Outdoor ozone concentration (ppb) */
   aqOutdoorOzone: number;
 
+  // === Hardware Identification ===
+
+  /** Thermostat model (e.g. 'ONEPLUS') */
+  statModel?: string;
+  /** Thermostat firmware version */
+  statFirmware?: string;
+  /** Indoor unit model, space-padded to 15 characters */
+  ctIFCModelNoCharacter1_15?: string;
+  /** Outdoor unit model, space-padded to 15 characters */
+  ctOutdoorModelNoCharacter1_15?: string;
+
   // === System Capabilities ===
 
   /** Whether emergency heat mode is available */

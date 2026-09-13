@@ -43,6 +43,16 @@ const getDeviceUrl = (deviceId: string) => {
   return `https://api.daikinskyport.com/deviceData/${deviceId}`;
 };
 
+// Model and firmware fields are fixed-width and space-padded. Slots the thermostat can't fill
+// come back empty, as dashes, or as non-printable filler.
+const readIdField = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed || /^-+$/.test(trimmed) || /[^ -~]/.test(trimmed)) {
+    return undefined;
+  }
+  return trimmed;
+};
+
 export class DaikinApi {
   private _token: DaikinTokenResponse | undefined;
   private _tokenExpiration = new Date(0);
@@ -73,6 +83,9 @@ export class DaikinApi {
   // Track emergency heat switch state per device. When the switch is ON, thermostat
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
   private _emergencyHeatEnabled: Map<string, boolean> = new Map();
+
+  // Devices whose data shape isn't recognized. Warned about once, then skipped.
+  private _unsupportedDevices: Set<string> = new Set();
 
   public constructor(user: string, password: string, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
     this.log = log;
@@ -154,6 +167,9 @@ export class DaikinApi {
       const data = await this.getDeviceData(device.id);
       if (!data) {
         this.log.error('Unable to retrieve data for %s [%s].', device.id, device.name);
+        continue;
+      }
+      if (!this.isRecognizedData(device, data)) {
         continue;
       }
       this._updateCache(device.id, data);
@@ -325,6 +341,63 @@ export class DaikinApi {
     return await this.getRequest(getDeviceUrl(deviceId));
   }
 
+  /**
+   * Hardware identity of a device, for logs and bug reports. Reported by the thermostat itself
+   * rather than the device list, which doesn't say what equipment is behind it.
+   */
+  public describeDevice(data: ThermostatData | undefined): string {
+    if (!data) {
+      return 'no data available';
+    }
+    const parts: string[] = [];
+    const thermostat = readIdField(data.statModel);
+    const firmware = readIdField(data.statFirmware);
+    const indoorUnit = readIdField(data.ctIFCModelNoCharacter1_15);
+    const outdoorUnit = readIdField(data.ctOutdoorModelNoCharacter1_15);
+    if (thermostat) {
+      parts.push(`thermostat ${thermostat}`);
+    }
+    if (firmware) {
+      parts.push(`firmware ${firmware}`);
+    }
+    if (indoorUnit) {
+      parts.push(`indoor unit ${indoorUnit}`);
+    }
+    if (outdoorUnit) {
+      parts.push(`outdoor unit ${outdoorUnit}`);
+    }
+    return parts.length > 0 ? parts.join(', ') : 'unidentified equipment';
+  }
+
+  /**
+   * A One+ thermostat payload always carries at least one of these. A payload with none of
+   * them comes from a different kind of device (a mini split, for example), whose fields this
+   * plugin can't read - caching it would push undefined values into every characteristic.
+   */
+  private isRecognizedData(device: Thermostat, data: ThermostatData): boolean {
+    const coreFields = ['mode', 'tempIndoor', 'hspActive', 'cspActive'] as const;
+    if (coreFields.some(field => data[field] !== undefined)) {
+      return true;
+    }
+
+    if (!this._unsupportedDevices.has(device.id)) {
+      this._unsupportedDevices.add(device.id);
+      const fields = Object.keys(data);
+      this.log.warn(
+        'Device %s [%s] returned data in an unrecognized format and will not be updated. This plugin supports the ' +
+          'Daikin One+ thermostat, but only a subset of devices the thermostat works with; other devices such as ' +
+          'mini splits are not yet supported. See ' +
+          'https://github.com/jeffschubert/homebridge-daikin-oneplus/issues/56 to help add support. ' +
+          'Received %d fields, starting with: %s',
+        device.id,
+        device.name,
+        fields.length,
+        fields.slice(0, 20).join(', '),
+      );
+    }
+    return false;
+  }
+
   private async refreshToken() {
     if (typeof this._token === 'undefined' || typeof this._token.refreshToken === 'undefined' || !this._token.refreshToken) {
       this.log.debug('Cannot refresh token. Getting new token.');
@@ -429,10 +502,10 @@ export class DaikinApi {
       case ThermostatMode.HEAT:
       case ThermostatMode.EMERGENCY_HEAT:
       case ThermostatMode.AUTO:
-        return data.hspActive;
+        return data.hspActive ?? -270;
       case ThermostatMode.COOL:
       default:
-        return data.cspActive;
+        return data.cspActive ?? -270;
     }
   }
 
