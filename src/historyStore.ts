@@ -1,6 +1,7 @@
 import type { Logging } from 'homebridge';
 import { EquipmentStatus, HistoryConsumer, DaikinOptions, ThermostatData, ThermostatMode, ThermostatReading } from './types.js';
 import { JsonlFileHistoryConsumer } from './jsonlFileHistoryConsumer.js';
+import { HttpPushHistoryConsumer, PushAuthScheme, PushBodyFormat } from './httpPushHistoryConsumer.js';
 
 /**
  * Captures readings independent of any single consumer (files, Eve, MQTT...).
@@ -38,6 +39,24 @@ export class HistoryStore {
           compressHistoryFiles: this.options.compressHistoryFiles ?? true,
         }),
       );
+    }
+    if (this.options.enableHistoryPush) {
+      const url = (this.options.pushUrl ?? '').trim();
+      if (url.length === 0) {
+        this.log.warn('History push is enabled but no URL is configured — no readings will be posted.');
+      } else {
+        this.registerConsumer(
+          new HttpPushHistoryConsumer(this.log, {
+            url: url,
+            token: this.options.pushToken,
+            authScheme: (this.options.pushAuthScheme as PushAuthScheme) || 'bearer',
+            bodyFormat: (this.options.pushBodyFormat as PushBodyFormat) || 'readings',
+            flushIntervalMs: Math.max(0, (this.options.pushIntervalSeconds ?? 0) * 1000),
+            maxBuffer: this.options.pushMaxBuffer ?? 200,
+            batchSize: this.options.pushBatchSize ?? 100,
+          }),
+        );
+      }
     }
     // Future consumers (MQTT, InfluxDB, etc.) can be registered here.
   }

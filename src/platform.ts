@@ -87,6 +87,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       compressHistoryFiles: config.compressHistoryFiles === undefined ? true : !!config.compressHistoryFiles,
       recordRawData: !!config.recordRawData,
       rawDataFields: config.rawDataFields ?? '',
+      enableHistoryPush: !!config.enableHistoryPush,
+      pushUrl: typeof config.pushUrl === 'string' ? config.pushUrl.trim() : '',
+      pushToken: typeof config.pushToken === 'string' ? config.pushToken.trim() : '',
+      pushAuthScheme: typeof config.pushAuthScheme === 'string' ? config.pushAuthScheme : 'bearer',
+      pushBodyFormat: typeof config.pushBodyFormat === 'string' ? config.pushBodyFormat : 'readings',
+      pushIntervalSeconds: config.pushIntervalSeconds,
+      pushMaxBuffer: config.pushMaxBuffer,
+      pushBatchSize: config.pushBatchSize,
     };
 
     this.debug('Debug logging on. Expect lots of messages.');
