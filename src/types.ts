@@ -280,6 +280,14 @@ export interface DaikinOptions {
   compressHistoryFiles: boolean;
   recordRawData: boolean;
   rawDataFields: string;
+  enableHistoryPush: boolean;
+  pushUrl: string;
+  pushToken: string;
+  pushAuthScheme: string;
+  pushBodyFormat: string;
+  pushIntervalSeconds: number;
+  pushMaxBuffer: number;
+  pushBatchSize: number;
 }
 
 /**

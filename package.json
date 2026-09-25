@@ -1,7 +1,7 @@
 {
   "displayName": "Homebridge Daikin One+",
   "name": "homebridge-daikin-oneplus",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "description": "Control a Daikin One+ thermostat.",
   "license": "Apache-2.0",
   "repository": {
@@ -38,14 +38,14 @@
     "oneplus"
   ],
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.18.0",
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-promise": "^7.2.1",
-    "globals": "^16.5.0",
+    "globals": "^17.12.0",
     "homebridge": "^1.6.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.6.2",

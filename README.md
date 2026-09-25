@@ -41,25 +41,9 @@
       * 33% : Low
       * 66% : Medium
       * 100% : High
-  * Version 2+ improves performance in several ways:
-    * Reduce bandwidth by checking the Daikin API every 3 minutes or on demand when interacting with HomeKit (instead of the previous every 10s)
-    * After updates, wait up to 15 seconds before checking API to avoid HomeKit showing stale data.
-  * Version 3 
-    * Minimum node version increased to 14
-    * Plugin is now verified!
-  * Version 4
-    * Minimum homebridge version increased to 1.8
-    * Minimum node version increased to 18
-    * Add System State option
-    * Add Device Data Logging option
-    * Better support for multiple thermostats
-    * Bug fixes and code quality improvements
-  * Version 4.1
-    * Route device data to pluggable consumers, including a History File consumer that writes daily JSONL files (configurable path/retention)
-    * Optionally attach raw Daikin API data, filtered to chosen fields
-  * Version 4.1.1
-    * History files are now gzip-compressed once their day ends, to reduce disk usage (enabled by default; configurable via Compress History Files)
 
+## Release Notes
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## Known Issue
   * Per [issue #20](https://github.com/jeffschubert/homebridge-daikin-oneplus/issues/20), it may now be necessary to request an integration token via the Daikin One Home app before this plugin can successfully communicate with the Daikin API.
@@ -106,9 +90,32 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "enableScheduleSwitch": false,      // If true, enable switch accessory to get/set the Schedule state of thermostats found in Daikin account.
     "debug": false,                     // If true, enables debug level logging.
     "logRaw": false,                    // If true, enables logging of raw device data from Daikin API. \'debug\' must also be set to true.
+    "enableHistoryPush": false,         // If true, POST each reading to the HTTP endpoint below.
+    "pushUrl": "",                      // Full URL readings are posted to, e.g. http://my-collector.local:8080/api/readings.
+    "pushToken": "",                    // Token sent with each request. Leave empty if the endpoint needs no authentication.
+    "pushAuthScheme": "bearer",         // How the token is sent: 'bearer' (Authorization: Bearer), 'apiKey' (X-Api-Key), or 'none'.
+    "pushBodyFormat": "readings",       // Body shape: 'readings' for { "readings": [...] }, or 'array' for a bare array.
+    "pushIntervalSeconds": 0,           // How often buffered readings are posted. 0 posts each reading as soon as it's captured.
+    "pushBatchSize": 100,               // Maximum readings per request.
+    "pushMaxBuffer": 200,               // Maximum unsent readings held in memory while the endpoint is unreachable.
   }
 ]
 ```
+
+### Pushing history to an HTTP endpoint
+
+Alongside (or instead of) the daily JSONL history files, readings can be POSTed
+as JSON to any endpoint. By default each reading is posted as soon as it's
+captured; set `pushIntervalSeconds` above 0 to batch them instead. A failed
+request keeps its readings buffered and retries, so a restart of the receiver
+doesn't lose data. Only the newest `pushMaxBuffer` readings are kept while the
+endpoint is unreachable — with raw data attached a reading can be ~50KB, so the
+default of 200 caps this at roughly 10MB, and the history files remain the
+durable record.
+
+Each reading is posted in the same shape as a line of the JSONL history files.
+Because a partially-delivered batch is re-sent whole, the receiving endpoint
+should ignore readings it has already stored.
 
 ## Acknowledgements
 The Daikin API requests and parsing of the results is based on the [daikinskyport](https://github.com/apetrycki/daikinskyport) repo by apetrycki.

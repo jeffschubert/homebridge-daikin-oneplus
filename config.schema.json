@@ -173,6 +173,112 @@
         "condition": {
           "functionBody": "return model.enableHistory === true"
         }
+      },
+      "enableHistoryPush": {
+        "title": "Push History to an HTTP Endpoint",
+        "type": "boolean",
+        "description": "POST each reading as JSON to an HTTP endpoint. Can be used on its own or alongside history files. Defaults to false.",
+        "default": false
+      },
+      "pushUrl": {
+        "title": "Push URL",
+        "type": "string",
+        "description": "Full URL readings are posted to, e.g. http://my-collector.local:8080/api/readings.",
+        "default": "",
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushToken": {
+        "title": "Push Token",
+        "type": "string",
+        "description": "Token sent with each request. Leave empty if the endpoint needs no authentication.",
+        "default": "",
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushAuthScheme": {
+        "title": "Push Authentication",
+        "type": "string",
+        "description": "How the token is sent. Defaults to an Authorization: Bearer header.",
+        "default": "bearer",
+        "oneOf": [
+          {
+            "title": "Authorization: Bearer <token>",
+            "enum": [
+              "bearer"
+            ]
+          },
+          {
+            "title": "X-Api-Key: <token>",
+            "enum": [
+              "apiKey"
+            ]
+          },
+          {
+            "title": "None",
+            "enum": [
+              "none"
+            ]
+          }
+        ],
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushBodyFormat": {
+        "title": "Push Body Format",
+        "type": "string",
+        "description": "Shape of the JSON posted, to suit the receiving endpoint.",
+        "default": "readings",
+        "oneOf": [
+          {
+            "title": "{ \"readings\": [ ... ] }",
+            "enum": [
+              "readings"
+            ]
+          },
+          {
+            "title": "Bare array [ ... ]",
+            "enum": [
+              "array"
+            ]
+          }
+        ],
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushIntervalSeconds": {
+        "title": "Push Interval (seconds)",
+        "type": "number",
+        "description": "How often buffered readings are posted. 0 (the default) posts each reading as soon as it's captured; a higher value batches them.",
+        "default": 0,
+        "minimum": 0,
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushBatchSize": {
+        "title": "Push Batch Size",
+        "type": "number",
+        "description": "Maximum readings per request, keeping POST bodies manageable when a backlog is being sent. Defaults to 100.",
+        "default": 100,
+        "minimum": 1,
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
+      },
+      "pushMaxBuffer": {
+        "title": "Push Buffer Size",
+        "type": "number",
+        "description": "Maximum unsent readings held in memory while the endpoint is unreachable. The oldest are dropped beyond this. A reading with raw data attached can be ~50KB, so keep this modest. Defaults to 200.",
+        "default": 200,
+        "minimum": 1,
+        "condition": {
+          "functionBody": "return model.enableHistoryPush === true"
+        }
       }
     }
   },
@@ -235,7 +341,15 @@
         "retentionDays",
         "compressHistoryFiles",
         "recordRawData",
-        "rawDataFields"
+        "rawDataFields",
+        "enableHistoryPush",
+        "pushUrl",
+        "pushToken",
+        "pushAuthScheme",
+        "pushBodyFormat",
+        "pushIntervalSeconds",
+        "pushBatchSize",
+        "pushMaxBuffer"
       ]
     },
     {
@@ -248,5 +362,6 @@
         "logRaw",
         "includeDeviceName"
       ]
-    }]
+    }
+  ]
 }

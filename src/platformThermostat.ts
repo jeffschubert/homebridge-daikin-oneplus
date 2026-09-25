@@ -255,14 +255,12 @@ export class DaikinOnePlusThermostat {
    * Handle requests to get the current value of the "Temperature Display Units" characteristic
    */
   private handleTemperatureDisplayUnitsGet(): CharacteristicValue {
-    let targetUnits = this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT;
     const displayUnits = this.daikinApi.getDisplayUnits(this.deviceId);
     // set this to a valid value for TemperatureDisplayUnits
-    if (displayUnits === 0) {
-      targetUnits = this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT;
-    } else {
-      targetUnits = this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS;
-    }
+    const targetUnits =
+      displayUnits === 0
+        ? this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT
+        : this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS;
     this.platform.log.debug('%s - Get TemperatureDisplayUnits: %s', this.accessory.displayName, targetUnits);
     return targetUnits;
   }
@@ -361,7 +359,7 @@ export class DaikinOnePlusThermostat {
    */
   private async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TemperatureDisplayUnits: %s', this.accessory.displayName, value);
-    let requestedUnits = 0; //FAHRENHEIT
+    let requestedUnits: number;
     switch (value) {
       case this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT:
         requestedUnits = 0;
