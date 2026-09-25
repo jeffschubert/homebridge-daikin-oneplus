@@ -41,26 +41,9 @@
       * 33% : Low
       * 66% : Medium
       * 100% : High
-  * Version 2+ improves performance in several ways:
-    * Reduce bandwidth by checking the Daikin API every 3 minutes or on demand when interacting with HomeKit (instead of the previous every 10s)
-    * After updates, wait up to 15 seconds before checking API to avoid HomeKit showing stale data.
-  * Version 3 
-    * Minimum node version increased to 14
-    * Plugin is now verified!
-  * Version 4
-    * Minimum homebridge version increased to 1.8
-    * Minimum node version increased to 18
-    * Add System State option
-    * Add Device Data Logging option
-    * Better support for multiple thermostats
-    * Bug fixes and code quality improvements
-  * Version 4.1
-    * Route device data to pluggable consumers, including a History File consumer that writes daily JSONL files (configurable path/retention)
-    * Optionally attach raw Daikin API data, filtered to chosen fields
-  * Version 4.1.1
-    * History files are now gzip-compressed once their day ends, to reduce disk usage (enabled by default; configurable via Compress History Files)
-    * New HTTP push consumer: readings can be POSTed as JSON to any endpoint on an interval
 
+## Release Notes
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each version.
 
 ## Known Issue
   * Per [issue #20](https://github.com/jeffschubert/homebridge-daikin-oneplus/issues/20), it may now be necessary to request an integration token via the Daikin One Home app before this plugin can successfully communicate with the Daikin API.
