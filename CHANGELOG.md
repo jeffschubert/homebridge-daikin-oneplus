@@ -8,7 +8,7 @@ change — and dependency bumps, formatting and other housekeeping are left out.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 4.2.0 — unreleased
+## 4.2.0 — 2026-09-24
 
 ### Added
 - HTTP push history consumer: readings can be POSTed as JSON to any endpoint,
