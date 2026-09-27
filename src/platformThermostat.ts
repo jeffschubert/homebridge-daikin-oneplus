@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
-import { AccessoryContext, ThermostatMode } from './types.js';
+import { AccessoryContext, EquipmentStatus, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
 /**
@@ -9,6 +9,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
  */
 export class DaikinOnePlusThermostat {
   private service: Service;
+  private loggingService: InstanceType<DaikinOnePlusPlatform['FakeGatoHistoryService']>;
 
   public constructor(
     private readonly platform: DaikinOnePlusPlatform,
@@ -107,6 +108,11 @@ export class DaikinOnePlusThermostat {
       })
       .onSet(this.handleTargetHumiditySet.bind(this));
 
+    this.loggingService = new this.platform.FakeGatoHistoryService('thermo', this.accessory, {
+      log: this.platform.log,
+      storage: 'fs',
+    });
+
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
@@ -141,6 +147,20 @@ export class DaikinOnePlusThermostat {
     this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
     this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
     this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
+
+    const currentTemp = this.daikinApi.getCurrentTemp(this.deviceId);
+    const setTemp = this.daikinApi.getTargetTemp(this.deviceId);
+    const status = this.daikinApi.getCurrentStatus(this.deviceId);
+    const isRunning =
+      status === EquipmentStatus.HEATING ||
+      status === EquipmentStatus.COOLING ||
+      status === EquipmentStatus.OVERCOOL_DEHUMIDIFYING;
+    this.loggingService.addEntry({
+      time: Math.round(Date.now() / 1000),
+      currentTemp,
+      setTemp,
+      valvePosition: isRunning ? 100 : 0,
+    });
   }
 
   /**
