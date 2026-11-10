@@ -8,6 +8,7 @@ import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch.js';
 import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch.js';
 import { DaikinOnePlusStateSwitch } from './platformStateSwitch.js';
 import { DaikinApi } from './daikinapi.js';
+import { CloudTransport } from './cloudTransport.js';
 import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch.js';
 import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan.js';
 import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
@@ -104,7 +105,8 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     this.historyStore = new HistoryStore(this.log, this.config);
 
-    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw, this.historyStore);
+    const transport = new CloudTransport(this.config.user, this.config.password, this.log);
+    this.daikinApi = new DaikinApi(transport, this.log, this.config.logRaw, this.historyStore);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
