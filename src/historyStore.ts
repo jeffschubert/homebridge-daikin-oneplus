@@ -1,3 +1,4 @@
+import { Zone } from './zones.js';
 import type { Logging } from 'homebridge';
 import { EquipmentStatus, HistoryConsumer, DaikinOptions, ThermostatData, ThermostatMode, ThermostatReading } from './types.js';
 import { JsonlFileHistoryConsumer } from './jsonlFileHistoryConsumer.js';
@@ -65,12 +66,30 @@ export class HistoryStore {
     this.consumers.push(consumer);
   }
 
-  public async record(deviceId: string, data: ThermostatData, setPoint: number): Promise<void> {
+  public async record(deviceId: string, data: ThermostatData, setPoint: number, zone?: Zone): Promise<void> {
     if (this.consumers.length === 0) {
       return; // nothing registered to receive this reading
     }
 
     const reading: ThermostatReading = this.getThermostatReading(deviceId, data, setPoint);
+
+    if (zone) {
+      reading.zoneNumber = zone.number;
+      reading.zoneName = zone.name;
+      const valid = (value: unknown, min: number, max: number): value is number =>
+        typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max && value !== 255;
+      if (!valid(data.tempIndoor, -100, 100)) delete reading.indoorTemperature;
+      if (!valid(data.humIndoor, 0, 100)) delete reading.indoorHumidity;
+      if (!valid(setPoint, 0, 50)) delete reading.setpoint;
+      if (!valid(data.mode, 0, 4)) {
+        delete reading.mode;
+        delete reading.modeName;
+      }
+      if (!valid(data.equipmentStatus, 1, 5)) {
+        delete reading.state;
+        delete reading.stateName;
+      }
+    }
 
     for (const consumer of this.consumers) {
       try {

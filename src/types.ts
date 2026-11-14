@@ -85,6 +85,7 @@ export interface Thermostat extends ThermostatInfo {
  * which is the same API used by the Daikin One Home mobile app.
  */
 export interface ThermostatData {
+  [field: string]: unknown;
   // === Operating Mode & Status ===
 
   /** Current operating mode (0=off, 1=heat, 2=cool, 3=auto, 4=emergency heat) */
@@ -249,12 +250,14 @@ export type ThermostatUpdate = Partial<ThermostatData>;
  */
 export interface AccessoryContext {
   device: Thermostat;
+  zoneNumber?: number;
 }
 
 /**
  * Plugin configuration options.
  */
 export interface DaikinOptions {
+  enableAdditionalZoneControls: boolean;
   debug: boolean;
   user: string;
   password: string;
@@ -298,6 +301,8 @@ export interface DaikinOptions {
 export interface ThermostatReading {
   timestamp: number; // ms since epoch
   deviceId: string;
+  zoneNumber?: number;
+  zoneName?: string;
   indoorTemperature?: number;
   outdoorTemperature?: number;
   indoorHumidity?: number;

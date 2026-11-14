@@ -1,3 +1,4 @@
+import { discoverZones, zoneData, zoneField, zoneIdentity, zoneUpdate } from './zones.js';
 import { hrtime } from 'process';
 import { Logging } from 'homebridge';
 import {
@@ -58,6 +59,7 @@ export class DaikinApi {
   private _tokenExpiration = new Date(0);
   private _devices: Map<string, Thermostat> = new Map(); // cache of all devices (thermostats) and their state
   private _isInitialized = false;
+  private stopped = false;
   private _listeners: Map<string, Set<DataChanged>> = new Map();
 
   private _lastUpdateTimeMs = -1;
@@ -65,6 +67,8 @@ export class DaikinApi {
   private _noUpdateBeforeMs = 0;
   private _updateTimeout?: NodeJS.Timeout;
 
+  private writeGeneration = 0;
+  private activeWrites = 0;
   private _lastWriteStartTimeMs = -1;
   private _lastWriteFinishTimeMs = -1;
   private _lastReadStartTimeMs = -1;
@@ -76,9 +80,9 @@ export class DaikinApi {
   private logRaw: boolean;
   private historyStore: HistoryStore;
 
-  // Pending thresholds per device for AUTO mode. HomeKit sends heat and cool thresholds
-  // separately, but the Daikin API requires both in a single request.
-  private _pendingThresholds: Map<string, { heat?: number; cool?: number }> = new Map();
+  private readonly zoneWrites = new Map<string, Promise<boolean>>();
+  private readonly readTimes = new Map<string, number>();
+  private readonly staleAfterMs = 10 * 60 * 1000;
 
   // Track emergency heat switch state per device. When the switch is ON, thermostat
   // mode changes to HEAT should use EMERGENCY_HEAT instead.
@@ -87,7 +91,14 @@ export class DaikinApi {
   // Devices whose data shape isn't recognized. Warned about once, then skipped.
   private _unsupportedDevices: Set<string> = new Set();
 
-  public constructor(user: string, password: string, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
+  public constructor(
+    user: string,
+    password: string,
+    log: Logging,
+    logRaw: boolean,
+    historyStore: HistoryStore,
+    private readonly enableAdditionalZoneControls = false,
+  ) {
     this.log = log;
     this.user = user;
     this.password = password;
@@ -152,6 +163,7 @@ export class DaikinApi {
   }
 
   private async getData() {
+    const pollGeneration = this.writeGeneration;
     this.log.debug('Getting data...');
     this._lastReadStartTimeMs = this._monotonic_clock_ms();
     this._lastReadFinishTimeMs = -1;
@@ -164,19 +176,28 @@ export class DaikinApi {
     );
 
     for (const device of this._devices.values()) {
+      const generation = this.writeGeneration;
       const data = await this.getDeviceData(device.id);
+      if (generation !== this.writeGeneration || this.activeWrites > 0 || this._noUpdateBeforeMs > this._monotonic_clock_ms()) continue;
       if (!data) {
         this.log.error('Unable to retrieve data for %s [%s].', device.id, device.name);
+        this.notifyListeners(device.id);
         continue;
       }
       if (!this.isRecognizedData(device, data)) {
+        this.notifyListeners(device.id);
         continue;
       }
-      this._updateCache(device.id, data);
+      device.data = data;
+      this.readTimes.set(device.id, Date.now());
       this.log.debug('Notifying listeners for device %s', device.id);
       this.notifyListeners(device.id);
       this.log.debug('Recording history for device %s', device.id);
       void this.historyStore.record(device.id, data, this.getTargetTempFromData(data));
+      for (const zone of discoverZones(device).filter(zone => zone.number > 1)) {
+        const values = zoneData(data, zone.number);
+        void this.historyStore.record(device.id, values, this.getTargetTempFromData(values), zone);
+      }
     }
     this.log.debug('Updated data.');
     this._lastReadFinishTimeMs = this._monotonic_clock_ms();
@@ -189,7 +210,13 @@ export class DaikinApi {
     );
 
     this._nextUpdateTimeMs = -1;
-    this._scheduleUpdate();
+    this._scheduleUpdate(this.activeWrites > 0 || pollGeneration !== this.writeGeneration ? DAIKIN_DEVICE_WRITE_DELAY_MS : undefined);
+  }
+
+  public destroy(): void {
+    this.stopped = true;
+    clearTimeout(this._updateTimeout);
+    this._listeners.clear();
   }
 
   public updateNow() {
@@ -208,6 +235,7 @@ export class DaikinApi {
    * @param asap perform update as soon as allowed by DAIKIN_DEVICE_FOREGROUND_REFRESH_MS
    */
   private _scheduleUpdate(blockUntilMs?: number, asap = false) {
+    if (this.stopped) return;
     if (asap) {
       this._scheduleAsap(blockUntilMs);
     } else {
@@ -295,6 +323,7 @@ export class DaikinApi {
     try {
       const response = await fetch(DAIKIN_API_LOGIN_URL, {
         method: 'POST',
+        signal: AbortSignal.timeout(30_000),
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
@@ -406,6 +435,7 @@ export class DaikinApi {
     try {
       const response = await fetch(DAIKIN_API_TOKEN_URL, {
         method: 'POST',
+        signal: AbortSignal.timeout(30_000),
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
@@ -441,6 +471,7 @@ export class DaikinApi {
     }
     try {
       const response = await fetch(uri, {
+        signal: AbortSignal.timeout(30_000),
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${this._token.accessToken}`,
@@ -579,106 +610,87 @@ export class DaikinApi {
     return this._emergencyHeatEnabled.get(deviceId) ?? false;
   }
 
-  public async setTargetTemps(deviceId: string, targetTemp?: number, heatThreshold?: number, coolThreshold?: number): Promise<boolean> {
-    const deviceData = this._devices.get(deviceId)?.data;
-    if (!deviceData) {
-      this.log.error('Cannot set target temps - no data for device:', deviceId);
-      return false;
+  public getZoneValue(deviceId: string, zone: number, field: string): number {
+    const data = this._devices.get(deviceId)?.data;
+    if (
+      !data ||
+      Date.now() - (this.readTimes.get(deviceId) ?? 0) > this.staleAfterMs ||
+      (zone > 1 ? data[`Zone${zone}Enable`] !== 1 : data.Zone1Enable !== undefined && data.Zone1Enable !== 1)
+    ) {
+      throw new Error('Zone data unavailable or expired');
     }
-
-    // apiData: fields to send to API (only writable fields)
-    // cacheUpdate: fields to update in local cache (includes read-only derived fields for immediate UI feedback)
-    let apiData: ThermostatUpdate;
-    let cacheUpdate: ThermostatUpdate;
-
-    // Only send the request if the request provides a value pertinent to the current state/mode.
-    switch (deviceData.mode) {
-      case ThermostatMode.HEAT:
-      case ThermostatMode.EMERGENCY_HEAT:
-        if (!targetTemp) {
-          return true;
-        }
-
-        apiData = { hspHome: targetTemp };
-        cacheUpdate = { hspHome: targetTemp, hspActive: targetTemp };
-        break;
-      case ThermostatMode.COOL:
-        if (!targetTemp) {
-          return true;
-        }
-
-        apiData = { cspHome: targetTemp };
-        cacheUpdate = { cspHome: targetTemp, cspActive: targetTemp };
-        break;
-      case ThermostatMode.OFF:
-        // Do nothing when off
-        return true;
-      case ThermostatMode.AUTO: {
-        // Disregard setting Target Temp when in auto/off
-        if (targetTemp) {
-          return true;
-        }
-
-        // Get or create pending thresholds for this device
-        let pending = this._pendingThresholds.get(deviceId);
-        if (!pending) {
-          pending = {};
-          this._pendingThresholds.set(deviceId, pending);
-        }
-
-        // Accumulate thresholds - HomeKit sends them separately
-        if (coolThreshold !== undefined) {
-          pending.cool = coolThreshold;
-        }
-        if (heatThreshold !== undefined) {
-          pending.heat = heatThreshold;
-        }
-
-        // Wait until we have both thresholds before sending to API
-        if (pending.heat === undefined || pending.cool === undefined) {
-          return true;
-        }
-
-        apiData = {
-          hspHome: pending.heat,
-          cspHome: pending.cool,
-        };
-        cacheUpdate = {
-          hspHome: pending.heat,
-          hspActive: pending.heat,
-          cspHome: pending.cool,
-          cspActive: pending.cool,
-        };
-
-        // Reset pending thresholds for this device
-        this._pendingThresholds.delete(deviceId);
-        break;
-      }
-      default:
-        this.log.info('Device is in an unknown state: %s. Unable to set target temp. (%s)', deviceData.mode, deviceId);
-        return false;
-    }
-
-    if (deviceData.schedEnabled) {
-      apiData.schedOverride = 1;
-      cacheUpdate.schedOverride = 1;
-    }
-
-    const success = await this.putRequest(deviceId, apiData, 'setTargetTemps', 'Error updating target temp:');
-    if (success) {
-      // Update cache with both API fields and derived fields for immediate UI feedback
-      this._updateCache(deviceId, cacheUpdate);
-    }
-    return success;
+    const value = data[zoneField(zone, field)];
+    if (typeof value !== 'number' || !Number.isFinite(value) || value === 255) throw new Error(`Zone ${zone}: ${field} unavailable`);
+    return value;
   }
 
-  public async setTargetState(deviceId: string, requestedState: ThermostatMode): Promise<boolean> {
-    const requestedData = {
-      mode: requestedState,
-    };
-    // Update cache immediately so subsequent commands (e.g., setTargetTemps from a scene) see the new mode
-    this._updateCache(deviceId, { mode: requestedState });
-    return this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
+  private async queueZoneWrite(deviceId: string, zone: number, action: () => Promise<boolean>): Promise<boolean> {
+    if (zone > 1 && !this.enableAdditionalZoneControls) {
+      return Promise.reject(new Error('Additional-zone controls are disabled. enableAdditionalZoneControls requires hardware validation.'));
+    }
+    const key = zoneIdentity(deviceId, zone);
+    const previous = this.zoneWrites.get(key) ?? Promise.resolve(true);
+    const next = (async () => {
+      try {
+        await previous;
+      } catch {
+        /* A failed edit must not block later edits. */
+      }
+      return action();
+    })();
+    this.zoneWrites.set(key, next);
+    try {
+      return await next;
+    } finally {
+      if (this.zoneWrites.get(key) === next) this.zoneWrites.delete(key);
+    }
+  }
+
+  public async setTargetTemps(
+    deviceId: string,
+    targetTemp?: number,
+    heatThreshold?: number,
+    coolThreshold?: number,
+    zone = 1,
+  ): Promise<boolean> {
+    return this.queueZoneWrite(deviceId, zone, async () => {
+      const mode = this.getZoneValue(deviceId, zone, 'mode');
+      let values: ThermostatUpdate;
+      if (mode === ThermostatMode.AUTO) {
+        if (targetTemp !== undefined) return true;
+        const heat = heatThreshold ?? this.getZoneValue(deviceId, zone, 'hspActive');
+        const cool = coolThreshold ?? this.getZoneValue(deviceId, zone, 'cspActive');
+        if (!Number.isFinite(heat) || !Number.isFinite(cool) || heat > cool || heat === 255 || cool === 255) return false;
+        values = { hspHome: heat, cspHome: cool };
+      } else if (mode === ThermostatMode.HEAT || mode === ThermostatMode.EMERGENCY_HEAT) {
+        if (targetTemp === undefined) return true;
+        values = { hspHome: targetTemp };
+      } else if (mode === ThermostatMode.COOL) {
+        if (targetTemp === undefined) return true;
+        values = { cspHome: targetTemp };
+      } else return mode === ThermostatMode.OFF;
+      if (Object.values(values).some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 50))
+        return false;
+      const data = this._devices.get(deviceId)!.data!;
+      const schedule = data[zoneField(zone, 'schedEnabled')];
+      if (schedule === undefined || schedule === 255) throw new Error('Zone schedule state unavailable');
+      if (schedule === true || schedule === 1) values.schedOverride = 1;
+      const success = await this.putRequest(deviceId, zoneUpdate(zone, values), 'setTargetTemps', 'Error updating zone temperatures:');
+      if (success) {
+        const derived: ThermostatUpdate = {};
+        if (values.hspHome !== undefined) derived.hspActive = values.hspHome;
+        if (values.cspHome !== undefined) derived.cspActive = values.cspHome;
+        this._updateCache(deviceId, zoneUpdate(zone, derived));
+      }
+      return success;
+    });
+  }
+
+  public async setTargetState(deviceId: string, requestedState: ThermostatMode, zone = 1): Promise<boolean> {
+    return this.queueZoneWrite(deviceId, zone, async () => {
+      this.getZoneValue(deviceId, zone, 'mode');
+      return this.putRequest(deviceId, zoneUpdate(zone, { mode: requestedState }), 'setTargetState', 'Error updating zone mode:');
+    });
   }
 
   public async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {
@@ -770,6 +782,17 @@ export class DaikinApi {
   }
 
   private async putRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
+    this.writeGeneration++;
+    this.activeWrites++;
+    try {
+      return await this.performPutRequest(deviceId, requestData, caller, errorHeader);
+    } finally {
+      this.activeWrites--;
+      this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
+    }
+  }
+
+  private async performPutRequest(deviceId: string, requestData: ThermostatUpdate, caller: string, errorHeader: string): Promise<boolean> {
     this.log.debug('Writing data: %s-> device: %s; requestData: %s', caller, deviceId, JSON.stringify(requestData));
     this._lastWriteStartTimeMs = this._monotonic_clock_ms();
     this._lastWriteFinishTimeMs = -1;
@@ -781,7 +804,9 @@ export class DaikinApi {
       this._lastReadFinishTimeMs,
     );
 
+    if (new Date() >= this._tokenExpiration) await this.refreshToken();
     if (!this._token) {
+      this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       this.log.error('No token for write request: %s', deviceId);
       return false;
     }
@@ -790,6 +815,7 @@ export class DaikinApi {
       const uri = getDeviceUrl(deviceId);
       const response = await fetch(uri, {
         method: 'PUT',
+        signal: AbortSignal.timeout(30_000),
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',
@@ -804,7 +830,7 @@ export class DaikinApi {
         return false;
       }
 
-      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(response.json()));
+      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, response.status);
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       this.log.debug(
         'WF: %d ; %d ; GT: %d ; %d',

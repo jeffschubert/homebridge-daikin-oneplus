@@ -1,5 +1,6 @@
-# Ignore source code
+# Ignore source code and regression fixtures
 src
+test
 
 # ------------- Defaults ------------- #
 
@@ -98,7 +99,6 @@ web_modules/
 
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Gatsby files
 .cache/

@@ -121,3 +121,59 @@ should ignore readings it has already stored.
 The Daikin API requests and parsing of the results is based on the [daikinskyport](https://github.com/apetrycki/daikinskyport) repo by apetrycki.
 
 Many thanks to [Fabian Frank](https://github.com/FabianFrank) for his valued contributions throughout the project.
+
+## Multiple thermostats and HVAC zones
+
+Every physical thermostat is polled once per cycle. Each enabled zone becomes a separate HomeKit thermostat with its own current temperature, relative humidity, operating state, mode, and active heating/cooling thresholds. Discovery accepts `ZoneNEnable: 1` for any zone number; `0`, `255`, missing enable fields, and `ZoneInt` placeholders do not create additional zones. Devices without zone metadata retain the original single-thermostat behavior and naming.
+
+For a device named **Main Room**, `Zone1Name: "Zone1"` produces **Main Room**, and `Zone2Name: "Upstairs"` produces **Upstairs**. Custom zone names are used directly; unnamed/generic additional zones use the device name plus zone number. Device names and zone names never determine accessory identity. Zone 1 keeps its existing UUID, preserving HomeKit room assignments and automations. Renaming may require updating a name previously customized in the Home app. Multiple physical thermostats and third/later zones have distinct stable identities even when their names match.
+
+Zone 1 reads unprefixed operational fields; later zones read `ZoneN` fields. Missing, invalid, disabled, and `255` readings produce HomeKit communication errors rather than main-zone fallbacks. Successful polls replace the readings, so missing values do not survive from an older response. Readings expire after ten minutes without a successful recognized response; errors are pushed on subsequent polls and returned immediately on HomeKit reads. Explicitly disabled zones are removed; missing metadata or API failures retain cached accessories. Retained additional zones with missing enable metadata report unavailable until it returns. Zone changes are discovered during normal polling; newly added physical thermostats require a Homebridge restart.
+
+### Experimental controls: opt in only after planning hardware validation
+
+Additional zones are **display-only by default**. Keep this platform setting omitted or false for read-only validation:
+
+```json
+"enableAdditionalZoneControls": false
+```
+
+Attempting to control an additional zone returns a HomeKit communication error, logs the reason, and sends no PUT. The existing primary-zone controls remain enabled. Disable automations that could issue primary-zone writes during a read-only validation session.
+
+Setting `enableAdditionalZoneControls` to `true` opts in to **unverified** additional-zone temperature and mode writes. This is a platform-wide setting, applying to all additional zones on all physical thermostats. The proposed mapping sends `ZoneNhspHome`, `ZoneNcspHome`, `ZoneNmode`, and, when that zone's schedule is enabled, `ZoneNschedOverride: 1` to the physical device's `/deviceData/{deviceId}` endpoint. Zone 1 continues using unprefixed writable Home fields. Active fields are display values and are never sent in PUTs. `CurrentViewedZone` is never changed.
+
+In Auto mode, editing one threshold immediately sends both Home setpoints, retaining the other current active threshold. Same-zone edits serialize; separate zones maintain separate queues and cache fields. Invalid/crossed thresholds or unavailable counterpart/schedule data fail without a PUT. Failed requests leave the cache unchanged. Successful requests update the cache optimistically, then the next poll reconciles with hardware after the existing 15-second write delay. Foreground/background polling remains 10/180 seconds. An optimistic HomeKit value or HTTP success is **not** proof of independent zone control.
+
+Verified on the supplied ONEPLUS firmware 4.1.6 example: zone discovery and additional-zone readings use the `ZoneN` schema, with Celsius temperatures. Additional-zone writes, merged-zone behavior, zone-specific constraints/deadbands, and support on other firmware/hardware remain unverified. The plugin does not claim that a zone merged with Zone 1 can be controlled independently.
+
+### Shared equipment and history
+
+Outdoor temperature/humidity, indoor/outdoor AQI, One Clean, Circulate Air, and emergency heat remain one set per physical thermostat. Existing schedule, away, state switches, and target-humidity controls retain their main-zone mappings. Additional-zone schedule/away switches, fans, emergency heat, and humidification controls are deferred until their capabilities and write semantics are verified. Each zone thermostat does expose its own current humidity and operating state. Display units are shared: additional thermostats display the physical thermostat's units, but attempts to change them there return an error; change units through the main thermostat.
+
+History/export keeps the existing main-zone record format. Additional-zone records retain the physical `deviceId` and add `zoneNumber` and `zoneName`, with normalized readings from that zone only. Consumers must group additional readings by `(deviceId, zoneNumber)`; absent `zoneNumber` means the legacy main record. Outdoor readings are not duplicated in additional-zone records. Optional raw fields in additional-zone records use operational names with the zone prefix removed; raw field filters should use those names.
+
+### Install this modified checkout into an existing Homebridge setup
+
+Back up your Homebridge configuration and cached accessories, and record the currently installed plugin version for rollback. Do not remove HomeKit accessories or reset the Homebridge cache. Use a supported Node version (see `package.json`) and run in this checkout:
+
+```sh
+npm ci
+npm run verify
+npm test
+npm pack
+```
+
+Install the resulting `homebridge-daikin-oneplus-4.2.0.tgz` on the Homebridge host, using the npm installation directory and service account used by that Homebridge instance. For a conventional global npm installation:
+
+```sh
+npm install -g /absolute/path/homebridge-daikin-oneplus-4.2.0.tgz
+```
+
+An administrator may need to run that install. Homebridge UI/Docker installations can have a different plugin directory: install into that instance's existing plugin directory rather than a second, unrelated global npm prefix. Keep the existing `DaikinOnePlus` platform, credentials, and settings; add `"enableAdditionalZoneControls": false`. Restart Homebridge using its normal service/UI controls. This build retains version 4.2.0, so an upstream plugin reinstall/update can replace the local modifications. The tarball includes compiled `dist` files; no npm publication is required. To roll back, reinstall the recorded upstream version in the same location and restart Homebridge.
+
+### Staged hardware validation
+
+1. **Read-only first.** Leave additional-zone controls false. Compare Main Room and Upstairs current temperature, humidity, mode, equipment status, and active thresholds with the Daikin app and physical thermostat across several polls. Confirm the existing primary accessory retains its room and automations, and that outdoor/system features are not duplicated. Restart Homebridge and confirm the same accessories return without duplicates. Review synthetic tests with `npm test`; they make no Daikin requests.
+2. **Obtain explicit authorization before live changes.** Record the exact physical device, zone number/name, property, current value, requested value, allowed mode/schedule changes, observation window, and restoration value. Obtain the owner's authorization for that exact test. Enabling the setting alone does not authorize live HVAC testing by a developer or agent.
+3. **One authorized change.** After authorization, enable additional-zone controls and restart Homebridge. Change only the approved zone/property. Wait at least 15 seconds, then allow a fresh poll (open the thermostat in HomeKit to request foreground polling). Confirm subsequent API readings and the Daikin app show the intended zone's writable/active settings changed as expected, including schedule override behavior. Compare every other zone before/after to confirm isolation. Do not rely on the immediate optimistic display or an HTTP 2xx response.
+4. **Extend only with authorization.** Separately authorize and test heating, cooling, single-threshold Auto edits in each direction, mode, schedule-enabled/disabled behavior, and finally concurrent-zone edits. Respect hardware constraints and merged zones. Restore the authorized original settings, confirm them through later readings and the app, disable the experimental setting, and restart. Keep the feature experimental until these observations establish independent controls on the specific hardware/firmware.

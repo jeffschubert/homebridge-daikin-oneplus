@@ -14,6 +14,7 @@ import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
 import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions, EquipmentStatus } from './types.js';
 import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
 import assert from 'node:assert';
+import { discoverZones, thermostatIdentity } from './zones.js';
 import { HistoryStore } from './historyStore.js';
 
 /**
@@ -32,6 +33,9 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic;
 
   private readonly daikinApi: DaikinApi;
+  private readonly zoneControllers = new Map<string, DaikinOnePlusThermostat>();
+  private readonly zoneDiscoveryListeners = new Set<string>();
+  private readonly sharedAccessoriesDiscovered = new Set<string>();
   private discoverTimer: NodeJS.Timeout | undefined;
 
   public readonly historyStore: HistoryStore;
@@ -62,6 +66,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     const storagePath = configuredStoragePath.length > 0 ? configuredStoragePath : api.user.storagePath();
 
     this.config = {
+      enableAdditionalZoneControls: config.enableAdditionalZoneControls === true,
       debug: !!config.debug,
       user: config.user,
       password: config.password,
@@ -104,7 +109,14 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     this.historyStore = new HistoryStore(this.log, this.config);
 
-    this.daikinApi = new DaikinApi(this.config.user, this.config.password, this.log, this.config.logRaw, this.historyStore);
+    this.daikinApi = new DaikinApi(
+      this.config.user,
+      this.config.password,
+      this.log,
+      this.config.logRaw,
+      this.historyStore,
+      this.config.enableAdditionalZoneControls,
+    );
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
@@ -143,6 +155,9 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   }
 
   public shutdown() {
+    clearTimeout(this.discoverTimer);
+    this.daikinApi.destroy();
+    for (const controller of this.zoneControllers.values()) controller.destroy();
     void this.historyStore.destroy();
   }
   /**
@@ -167,7 +182,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    await this.daikinApi.Initialize();
+    if (!this.daikinApi.isInitialized()) await this.daikinApi.Initialize();
 
     if (!this.daikinApi.isInitialized()) {
       this.log.error('Unable to retrieve devices. Aborting discovery of devices.');
@@ -178,10 +193,15 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     // loop over the discovered devices and register each one if it has not already been registered
     for (const device of devices) {
       this.log.info('Found device: %s', device.name);
-      const deviceData = await this.daikinApi.getDeviceData(device.id);
+      const deviceData = device.data;
       this.log.info('Device info: %s', this.daikinApi.describeDevice(deviceData));
 
       this.discoverThermostat(device);
+      if (!this.zoneDiscoveryListeners.has(device.id)) {
+        this.zoneDiscoveryListeners.add(device.id);
+        this.daikinApi.addListener(device.id, () => this.discoverThermostat(device));
+      }
+      if (this.sharedAccessoriesDiscovered.has(device.id)) continue;
       this.discoverOutdoorTemp(device);
       this.discoverOutdoorHumSensor(device);
       this.discoverIndoorHumSensor(device);
@@ -193,6 +213,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       this.discoverEmergencyHeatSwitch(device);
       this.discoverOneCleanFan(device);
       this.discoverCirculateAirFan(device);
+      this.sharedAccessoriesDiscovered.add(device.id);
     }
   }
 
@@ -374,7 +395,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, true);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         }
-      } else if (existingAccessory) {
+      } else if (existingAccessory && deviceData?.aqIndoorAvailable === false) {
         this.log.debug('Removing legacy indoor Air Quality Sensor from cache:', existingAccessory.displayName);
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
@@ -408,7 +429,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
           new DaikinOnePlusAQSensor(this, accessory, device.id, this.daikinApi, false);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
         }
-      } else if (existingAccessory) {
+      } else if (existingAccessory && deviceData?.aqOutdoorAvailable === false) {
         this.log.debug('Removing legacy outdoor Air Quality Sensor from cache:', existingAccessory.displayName);
         this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       }
@@ -477,29 +498,52 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
   }
 
   private discoverThermostat(device: Thermostat) {
-    const uuid = this.api.hap.uuid.generate(`${device.id}_tstat`);
-    this.log.debug('Checking for thermostat...');
-    const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-    if (!this.config.ignoreThermostat) {
-      const dName = this.accessoryName(device, 'Thermostat');
-      if (existingAccessory) {
-        // the accessory already exists
-        existingAccessory.displayName = dName;
-        existingAccessory.context.device = device;
-        this.log.debug('Restoring existing thermostat from cache:', existingAccessory.displayName);
-        new DaikinOnePlusThermostat(this, existingAccessory, device.id, this.daikinApi);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.debug('Adding new thermostat:', dName);
-
-        const accessory = new this.api.platformAccessory<AccessoryContext>(dName, uuid);
+    const zones = discoverZones(device);
+    // Bind retained accessories even when the first response is unavailable or incomplete.
+    for (const accessory of this.accessories) {
+      if (accessory.context.device.id !== device.id) continue;
+      const number =
+        accessory.context.zoneNumber ?? (accessory.UUID === this.api.hap.uuid.generate(thermostatIdentity(device.id, 1)) ? 1 : undefined);
+      if (number) accessory.context.zoneNumber = number;
+      if (number && !zones.some(zone => zone.number === number)) {
+        zones.push({ deviceId: device.id, number, name: accessory.displayName });
+      }
+    }
+    for (const zone of zones) {
+      const uuid = this.api.hap.uuid.generate(thermostatIdentity(device.id, zone.number));
+      if (this.config.ignoreThermostat) continue;
+      let accessory = this.accessories.find(accessory => accessory.UUID === uuid);
+      const name = Object.keys(device.data ?? {}).some(key => /^Zone[1-9]\d*Enable$/.test(key))
+        ? zone.name
+        : device.data && zone.number === 1
+          ? this.accessoryName(device, 'Thermostat')
+          : zone.name;
+      if (!accessory) {
+        accessory = new this.api.platformAccessory<AccessoryContext>(name, uuid);
         accessory.context.device = device;
-        new DaikinOnePlusThermostat(this, accessory, device.id, this.daikinApi);
+        accessory.context.zoneNumber = zone.number;
+        this.accessories.push(accessory);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
-    } else if (existingAccessory) {
-      this.log.debug('Removing Thermostat from cache:', existingAccessory.displayName);
-      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+      accessory.context.device = device;
+      accessory.context.zoneNumber = zone.number;
+      const controller = this.zoneControllers.get(uuid);
+      if (controller) controller.rename(name);
+      else {
+        accessory.displayName = name;
+        this.zoneControllers.set(uuid, new DaikinOnePlusThermostat(this, accessory, device.id, this.daikinApi, zone.number));
+      }
+      this.api.updatePlatformAccessories([accessory]);
+    }
+    for (const accessory of [...this.accessories]) {
+      if (accessory.context.device.id !== device.id || !accessory.context.zoneNumber) continue;
+      const enabled = device.data?.[`Zone${accessory.context.zoneNumber}Enable`];
+      // Only explicit disabled metadata is grounds for removal. Missing fields may be transient.
+      if (!this.config.ignoreThermostat && enabled !== 0 && enabled !== 255) continue;
+      this.zoneControllers.get(accessory.UUID)?.destroy();
+      this.zoneControllers.delete(accessory.UUID);
+      this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+      this.accessories.splice(this.accessories.indexOf(accessory), 1);
     }
   }
 
