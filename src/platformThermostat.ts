@@ -3,381 +3,153 @@ import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 
-/**
- * Thermostat
- * Exposes thermostat related characteristics for the Daikin One+ thermostat.
- */
 export class DaikinOnePlusThermostat {
-  private service: Service;
+  private readonly service: Service;
+  private readonly listener = () => this.updateValues();
+  private readonly readers = new Map<string, () => number>();
 
   public constructor(
     private readonly platform: DaikinOnePlusPlatform,
     private readonly accessory: PlatformAccessory<AccessoryContext>,
     private readonly deviceId: string,
     private readonly daikinApi: DaikinApi,
+    private readonly zone = 1,
   ) {
-    // set accessory information
-    this.accessory
-      .getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Daikin')
-      .setCharacteristic(this.platform.Characteristic.Model, accessory.context.device.model)
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.id)
-      .setCharacteristic(this.platform.Characteristic.FirmwareRevision, accessory.context.device.firmwareVersion);
-
-    // you can create multiple services for each accessory
-    this.service =
-      this.accessory.getService(this.platform.Service.Thermostat) || this.accessory.addService(this.platform.Service.Thermostat);
-
-    // set the service name, this is what is displayed as the default name on the Home app
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.displayName);
-
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState).onGet(() => {
-      this.daikinApi.updateNow();
-      return this.handleCurrentHeatingCoolingStateGet();
+    const C = platform.Characteristic;
+    accessory
+      .getService(platform.Service.AccessoryInformation)!
+      .setCharacteristic(C.Manufacturer, 'Daikin')
+      .setCharacteristic(C.Model, accessory.context.device.model)
+      .setCharacteristic(C.SerialNumber, zone === 1 ? deviceId : `${deviceId}-zone-${zone}`)
+      .setCharacteristic(C.FirmwareRevision, accessory.context.device.firmwareVersion);
+    this.service = accessory.getService(platform.Service.Thermostat) || accessory.addService(platform.Service.Thermostat);
+    this.rename(accessory.displayName);
+    this.bind('CurrentTemperature', () => this.read('tempIndoor', -100, 100));
+    this.bind('CurrentRelativeHumidity', () => this.read('humIndoor', 0, 100));
+    this.bind('CurrentHeatingCoolingState', () => {
+      const state = this.read('equipmentStatus', 1, 5);
+      return state === 1 || state === 2
+        ? C.CurrentHeatingCoolingState.COOL
+        : state === 3
+          ? C.CurrentHeatingCoolingState.HEAT
+          : C.CurrentHeatingCoolingState.OFF;
     });
+    this.bind(
+      'TargetHeatingCoolingState',
+      () => {
+        const mode = this.read('mode', 0, 4);
+        return mode === ThermostatMode.EMERGENCY_HEAT ? ThermostatMode.HEAT : mode;
+      },
+      async value => {
+        let mode = Number(value);
+        if (zone === 1 && mode === ThermostatMode.HEAT && daikinApi.isEmergencyHeatEnabled(deviceId)) mode = ThermostatMode.EMERGENCY_HEAT;
+        return daikinApi.setTargetState(deviceId, mode, zone);
+      },
+    );
+    this.bind(
+      'TargetTemperature',
+      () => {
+        const mode = this.read('mode', 0, 4);
+        return this.read(mode === ThermostatMode.COOL || mode === ThermostatMode.OFF ? 'cspActive' : 'hspActive', 0, 50);
+      },
+      value => daikinApi.setTargetTemps(deviceId, Number(value), undefined, undefined, zone),
+    );
+    this.bind(
+      'HeatingThresholdTemperature',
+      () => this.read('hspActive', 0, 50),
+      value => daikinApi.setTargetTemps(deviceId, undefined, Number(value), undefined, zone),
+    );
+    this.bind(
+      'CoolingThresholdTemperature',
+      () => this.read('cspActive', 0, 50),
+      value => daikinApi.setTargetTemps(deviceId, undefined, undefined, Number(value), zone),
+    );
+    this.updateValues();
+    this.service.getCharacteristic(C.TargetTemperature).setProps({ minStep: 0.5 });
+    this.service.getCharacteristic(C.HeatingThresholdTemperature).setProps({ minValue: 10, maxValue: 30, minStep: 0.1 });
+    this.service.getCharacteristic(C.CoolingThresholdTemperature).setProps({ minValue: 12, maxValue: 32, minStep: 0.1 });
+    // Display units and humidification controls are only supported on the physical/main thermostat.
+    this.bind(
+      'TemperatureDisplayUnits',
+      () => daikinApi.getDisplayUnits(deviceId),
+      async value => {
+        if (zone > 1) throw new Error('Display units are a shared equipment setting; use the main thermostat');
+        return daikinApi.setDisplayUnits(deviceId, Number(value));
+      },
+    );
+    if (zone === 1)
+      this.bind(
+        'TargetRelativeHumidity',
+        () => this.read('humSP', 0, 100),
+        value => daikinApi.setTargetHumidity(deviceId, Number(value)),
+      );
+    daikinApi.addListener(deviceId, this.listener);
+  }
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleThermostatModeGet();
-      })
-      .onSet(this.handleThermostatModeSet.bind(this));
+  public rename(name: string): void {
+    this.accessory.displayName = name;
+    this.service.setCharacteristic(this.platform.Characteristic.Name, name);
+  }
 
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature).onGet(() => {
+  public destroy(): void {
+    this.daikinApi.removeListener(this.deviceId, this.listener);
+  }
+
+  private read(field: string, min: number, max: number): number {
+    const value = this.daikinApi.getZoneValue(this.deviceId, this.zone, field);
+    if (value < min || value > max) throw new Error(`Zone ${this.zone}: invalid ${field}`);
+    return value;
+  }
+
+  private bind(name: string, read: () => number, write?: (value: CharacteristicValue) => Promise<boolean>): void {
+    const type = this.platform.Characteristic[
+      name as keyof typeof this.platform.Characteristic
+    ] as typeof this.platform.Characteristic.CurrentTemperature;
+    const characteristic = this.service.getCharacteristic(type);
+    const safeRead = () => {
+      try {
+        return read();
+      } catch {
+        throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
+      }
+    };
+    this.readers.set(name, safeRead);
+    characteristic.onGet(() => {
       this.daikinApi.updateNow();
-      return this.handleCurrentTemperatureGet();
+      return safeRead();
     });
-
-    this.service
-      .getCharacteristic(this.platform.Characteristic.TargetTemperature)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleTargetTemperatureGet();
-      })
-      .onSet(this.handleTargetTemperatureSet.bind(this))
-      .setProps({
-        minStep: 0.5,
-      });
-
-    this.service
-      .getCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleCoolingThresholdTemperatureGet();
-      })
-      .onSet(this.handleCoolingThresholdTemperatureSet.bind(this))
-      .setProps({
-        minValue: 12,
-        maxValue: 32,
-        minStep: 0.1,
-      });
-
-    this.service
-      .getCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleHeatingThresholdTemperatureGet();
-      })
-      .onSet(this.handleHeatingThresholdTemperatureSet.bind(this))
-      .setProps({
-        minValue: 10,
-        maxValue: 30,
-        minStep: 0.1,
-      });
-
-    this.service
-      .getCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleTemperatureDisplayUnitsGet();
-      })
-      .onSet(this.handleTemperatureDisplayUnitsSet.bind(this));
-
-    this.service.getCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity).onGet(() => {
-      this.daikinApi.updateNow();
-      return this.handleCurrentHumidityGet();
-    });
-
-    this.service
-      .getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleTargetHumidityGet();
-      })
-      .onSet(this.handleTargetHumiditySet.bind(this));
-
-    this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
-  }
-
-  private updateValues() {
-    const targetHeatingCoolingState = this.handleThermostatModeGet();
-    const heatingThresholdTemperature = this.handleHeatingThresholdTemperatureGet();
-    const coolingThresholdTemperature = this.handleCoolingThresholdTemperatureGet();
-
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentHeatingCoolingState, this.handleCurrentHeatingCoolingStateGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetHeatingCoolingState, targetHeatingCoolingState);
-
-    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.HEAT) {
-      this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
-        minValue: 10,
-        maxValue: 30,
-      });
-    }
-    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.COOL) {
-      this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature).setProps({
-        minValue: 12,
-        maxValue: 32,
-      });
-    }
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentTemperature, this.handleCurrentTemperatureGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetTemperature, this.handleTargetTemperatureGet());
-
-    if (targetHeatingCoolingState === this.platform.Characteristic.TargetHeatingCoolingState.AUTO) {
-      this.service.updateCharacteristic(this.platform.Characteristic.CoolingThresholdTemperature, coolingThresholdTemperature);
-      this.service.updateCharacteristic(this.platform.Characteristic.HeatingThresholdTemperature, heatingThresholdTemperature);
-    }
-
-    this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
-  }
-
-  /**
-   * Handle requests to get the current value of the "Current Heating Cooling State" characteristic
-   */
-  private handleCurrentHeatingCoolingStateGet(): CharacteristicValue {
-    //"equipmentStatus": the running state of the system, 1=cooling, 2=overcool dehumidifying, 3=heating, 4=fan, 5=idle,
-    // set this to a valid value for CurrentHeatingCoolingState
-    let currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.OFF;
-    const currentStatus = this.daikinApi.getCurrentStatus(this.deviceId);
-    switch (currentStatus) {
-      case 1:
-        currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.COOL;
-        break;
-      case 3:
-        currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
-        break;
-    }
-    this.platform.log.debug('%s - Get CurrentHeatingCoolingState: %d', this.accessory.displayName, currentValue);
-    return currentValue;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Target Heating Cooling State" characteristic
-   */
-  private handleThermostatModeGet(): CharacteristicValue {
-    // set this to a valid value for ThermostatMode
-    let currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
-    const currentStatus = this.daikinApi.getTargetState(this.deviceId);
-    // set this to a valid value for CurrentHeatingCoolingState
-    switch (currentStatus) {
-      case ThermostatMode.HEAT:
-      case ThermostatMode.EMERGENCY_HEAT:
-        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.HEAT;
-        break;
-      case ThermostatMode.COOL:
-        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.COOL;
-        break;
-      case ThermostatMode.AUTO:
-        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.AUTO;
-        break;
-      case ThermostatMode.OFF:
-        currentValue = this.platform.Characteristic.TargetHeatingCoolingState.OFF;
-        break;
-      default:
-        this.platform.log.debug(
-          '%s - Unable to get ThermostatMode. Unknown state retrieved: %s',
-          this.accessory.displayName,
-          currentStatus,
-        );
-        break;
-    }
-    this.platform.log.debug('%s - Get ThermostatMode: %d', this.accessory.displayName, currentValue);
-    return currentValue;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Current Temperature" characteristic
-   */
-  private handleCurrentTemperatureGet(): CharacteristicValue {
-    let currentTemp = this.daikinApi.getCurrentTemp(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (currentTemp < -270) {
-      currentTemp = -270;
-    } else if (currentTemp > 100) {
-      currentTemp = 100;
-    }
-    this.platform.log.debug('%s - Get CurrentTemperature: %f', this.accessory.displayName, currentTemp);
-    return currentTemp;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Target Temperature" characteristic
-   */
-  private handleTargetTemperatureGet(): CharacteristicValue {
-    let targetTemp = this.daikinApi.getTargetTemp(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (targetTemp < 10) {
-      targetTemp = 10;
-    } else if (targetTemp > 38) {
-      targetTemp = 38;
-    }
-    this.platform.log.debug('%s - Get TargetTemperature: %f', this.accessory.displayName, targetTemp);
-    return targetTemp;
-  }
-
-  private handleHeatingThresholdTemperatureGet(): CharacteristicValue {
-    let temp = this.daikinApi.heatingThresholdTemperature(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (temp < 0) {
-      temp = 0;
-    } else if (temp > 25) {
-      temp = 25;
-    }
-    this.platform.log.debug('%s - Get HeatingThresholdTemperature: %f', this.accessory.displayName, temp);
-    return temp;
-  }
-
-  private handleCoolingThresholdTemperatureGet(): CharacteristicValue {
-    let temp = this.daikinApi.coolingThresholdTemperature(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (temp < 10) {
-      temp = 10;
-    } else if (temp > 35) {
-      temp = 35;
-    }
-    this.platform.log.debug('%s - Get CoolingThresholdTemperature: %f', this.accessory.displayName, temp);
-    return temp;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Temperature Display Units" characteristic
-   */
-  private handleTemperatureDisplayUnitsGet(): CharacteristicValue {
-    const displayUnits = this.daikinApi.getDisplayUnits(this.deviceId);
-    // set this to a valid value for TemperatureDisplayUnits
-    const targetUnits =
-      displayUnits === 0
-        ? this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT
-        : this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS;
-    this.platform.log.debug('%s - Get TemperatureDisplayUnits: %s', this.accessory.displayName, targetUnits);
-    return targetUnits;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Current Relative Humidity" characteristic
-   */
-  private handleCurrentHumidityGet(): CharacteristicValue {
-    let currentHumidity = this.daikinApi.getCurrentHumidity(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (currentHumidity < 0) {
-      currentHumidity = 0;
-    } else if (currentHumidity > 100) {
-      currentHumidity = 100;
-    }
-    this.platform.log.debug('%s - Get CurrentRelativeHumidity: %f', this.accessory.displayName, currentHumidity);
-    return currentHumidity;
-  }
-
-  /**
-   * Handle requests to get the current value of the "Target Temperature" characteristic
-   */
-  private handleTargetHumidityGet(): CharacteristicValue {
-    let targetHumidity = this.daikinApi.getTargetHumidity(this.deviceId);
-    // set this to a valid value for CurrentTemperature
-    if (targetHumidity < 0) {
-      targetHumidity = 0;
-    } else if (targetHumidity > 100) {
-      targetHumidity = 100;
-    }
-    this.platform.log.debug('%s - Get TargetHumidity: %f', this.accessory.displayName, targetHumidity);
-    return targetHumidity;
-  }
-
-  /**
-   * Handle requests to set the "Target Heating Cooling State" characteristic
-   */
-  private async handleThermostatModeSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set ThermostatMode: %s', this.accessory.displayName, value);
-
-    // set this to a valid value for ThermostatMode
-    let requestedState = ThermostatMode.OFF;
-    // set this to a valid value for CurrentHeatingCoolingState
-    switch (value) {
-      case this.platform.Characteristic.TargetHeatingCoolingState.HEAT:
-        // Honor emergency heat switch: if it's ON, use EMERGENCY_HEAT instead of HEAT.
-        // HomeKit scenes capture all characteristics, so a scene that turns on emergency heat
-        // may also send HEAT mode - we use the switch state to determine user intent.
-        if (this.daikinApi.isEmergencyHeatEnabled(this.deviceId)) {
-          this.platform.log.debug('%s - Using emergency heat (switch is ON)', this.accessory.displayName);
-          requestedState = ThermostatMode.EMERGENCY_HEAT;
-        } else {
-          requestedState = ThermostatMode.HEAT;
+    if (write)
+      characteristic.onSet(async value => {
+        try {
+          if (!(await write(value))) throw new Error('Daikin rejected zone update');
+        } catch (error) {
+          this.platform.log.warn('Zone %d control failed: %s', this.zone, String(error));
+          throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
         }
-        break;
-      case this.platform.Characteristic.TargetHeatingCoolingState.COOL:
-        requestedState = ThermostatMode.COOL;
-        break;
-      case this.platform.Characteristic.TargetHeatingCoolingState.AUTO:
-        requestedState = ThermostatMode.AUTO;
-        break;
-      case this.platform.Characteristic.TargetHeatingCoolingState.OFF:
-        requestedState = ThermostatMode.OFF;
-        break;
+      });
+  }
+
+  private updateValues(): void {
+    try {
+      const mode = this.read('mode', 0, 4);
+      const target = this.service.getCharacteristic(this.platform.Characteristic.TargetTemperature);
+      if (mode === ThermostatMode.HEAT || mode === ThermostatMode.EMERGENCY_HEAT) target.setProps({ minValue: 10, maxValue: 30 });
+      if (mode === ThermostatMode.COOL) target.setProps({ minValue: 12, maxValue: 32 });
+    } catch {
+      /* Unavailable values are reported on each characteristic below. */
     }
-
-    await this.daikinApi.setTargetState(this.deviceId, requestedState);
-  }
-
-  /**
-   * Handle requests to set the "Target Temperature" characteristic
-   */
-  private async handleTargetTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set TargetTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, Number(value));
-  }
-
-  /**
-   * Handle requests to set the "Cooling Threshold Temperature" characteristic
-   */
-  private async handleCoolingThresholdTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set CoolingThresholdTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, undefined, undefined, Number(value));
-  }
-
-  /**
-   * Handle requests to set the "Heating Threshold Temperature" characteristic
-   */
-  private async handleHeatingThresholdTemperatureSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set HeatingThresholdTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, undefined, Number(value), undefined);
-  }
-
-  /**
-   * Handle requests to set the "Temperature Display Units" characteristic
-   */
-  private async handleTemperatureDisplayUnitsSet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set TemperatureDisplayUnits: %s', this.accessory.displayName, value);
-    let requestedUnits: number;
-    switch (value) {
-      case this.platform.Characteristic.TemperatureDisplayUnits.FAHRENHEIT:
-        requestedUnits = 0;
-        break;
-      case this.platform.Characteristic.TemperatureDisplayUnits.CELSIUS:
-        requestedUnits = 1;
-        break;
-      default:
-        requestedUnits = 0;
+    for (const [name, read] of this.readers) {
+      const type = this.platform.Characteristic[
+        name as keyof typeof this.platform.Characteristic
+      ] as typeof this.platform.Characteristic.CurrentTemperature;
+      try {
+        this.service.updateCharacteristic(type, read());
+      } catch {
+        this.service.updateCharacteristic(
+          type,
+          new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE),
+        );
+      }
     }
-    await this.daikinApi.setDisplayUnits(this.deviceId, requestedUnits);
-  }
-
-  /**
-   * Handle requests to set the "Target Humidity" characteristic
-   */
-  private async handleTargetHumiditySet(value: CharacteristicValue) {
-    this.platform.log.debug('%s - Set TargetHumidity: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetHumidity(this.deviceId, Number(value));
   }
 }

@@ -279,6 +279,12 @@
         "condition": {
           "functionBody": "return model.enableHistoryPush === true"
         }
+      },
+      "enableAdditionalZoneControls": {
+        "title": "Experimental additional-zone controls",
+        "type": "boolean",
+        "default": false,
+        "description": "Opt in to UNVERIFIED ZoneN-prefixed temperature and mode writes. Additional zones display without this setting. Validate on hardware before relying on controls."
       }
     }
   },
@@ -360,7 +366,8 @@
       "items": [
         "debug",
         "logRaw",
-        "includeDeviceName"
+        "includeDeviceName",
+        "enableAdditionalZoneControls"
       ]
     }
   ]
