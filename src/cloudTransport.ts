@@ -1,6 +1,6 @@
 import { Logging } from 'homebridge';
 import { Thermostat, ThermostatData, ThermostatUpdate } from './types.js';
-import { DaikinTransport, TransportTiming, logError } from './daikinTransport.js';
+import { ALL_CAPABILITIES, DaikinTransport, TransportTiming, logError } from './daikinTransport.js';
 
 /**
  * Token response from the Daikin authentication API.
@@ -35,6 +35,7 @@ const getDeviceUrl = (deviceId: string) => {
  */
 export class CloudTransport implements DaikinTransport {
   public readonly timing = CLOUD_TIMING;
+  public readonly capabilities = ALL_CAPABILITIES;
 
   private _token: DaikinTokenResponse | undefined;
   private _tokenExpiration = new Date(0);

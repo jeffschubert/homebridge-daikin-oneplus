@@ -6,7 +6,7 @@ import { DaikinOnePlusPlatform } from './platform.js';
 /**
  * Circulate Air Fan
  * Fan can either be on or off
- * Speed can be set to low, med, or high
+ * Speed can be set to low, med, or high where the transport supports it
  */
 export class DaikinOnePlusCirculateAirFan {
   private service: Service;
@@ -39,21 +39,27 @@ export class DaikinOnePlusCirculateAirFan {
       })
       .onSet(this.handleActiveSet.bind(this));
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.RotationSpeed)
-      .setProps({ minValue: 0, maxValue: 3, minStep: 1 })
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleSpeedGet();
-      })
-      .onSet(this.handleSpeedSet.bind(this));
+    if (this.daikinApi.capabilities.circulateFanSpeed) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.RotationSpeed)
+        .setProps({ minValue: 0, maxValue: 3, minStep: 1 })
+        .onGet(() => {
+          this.daikinApi.updateNow();
+          return this.handleSpeedGet();
+        })
+        .onSet(this.handleSpeedSet.bind(this));
+    } else if (this.service.testCharacteristic(this.platform.Characteristic.RotationSpeed)) {
+      this.service.removeCharacteristic(this.service.getCharacteristic(this.platform.Characteristic.RotationSpeed));
+    }
 
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
 
   private updateValues() {
     this.service.updateCharacteristic(this.platform.Characteristic.Active, this.handleActiveGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.handleSpeedGet());
+    if (this.daikinApi.capabilities.circulateFanSpeed) {
+      this.service.updateCharacteristic(this.platform.Characteristic.RotationSpeed, this.handleSpeedGet());
+    }
   }
 
   /**
