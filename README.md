@@ -75,7 +75,8 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
     "connectionMode": "cloud",          // 'cloud' (default) or 'local'. See "Cloud or Local mode" below.
     "user": "any@email.address",        // Required in cloud mode. The email of your Daikin One+ account.
     "password": "password",             // Required in cloud mode.
-    "localDevices": [                   // Required in local mode. One entry per thermostat.
+    "localDiscovery": true,             // Local mode: find thermostats on the network automatically (default true).
+    "localDevices": [                   // Local mode: thermostats to add by address. Required if localDiscovery is false.
       { "host": "192.168.1.52", "port": 80, "deviceId": "" }  // port defaults to 80; deviceId is optional (see below).
     ],
     "includeDeviceName": false,         // Required. Should the default sensor names start with the thermostat name (as configured in the thermostat).
@@ -118,10 +119,15 @@ keeps working without the Daikin cloud. To use it:
 1. Update the thermostat to the latest firmware, then turn on **Settings >
    Wi-Fi > Local API** on the thermostat itself (it can't be turned on from
    the app).
-2. Give the thermostat a fixed IP address, for example with a DHCP
-   reservation on your router.
-3. Set `connectionMode` to `local` and add the thermostat's address to
-   `localDevices`.
+2. Set `connectionMode` to `local`.
+
+The plugin finds thermostats on your network automatically using mDNS, and
+follows a thermostat if its IP address changes. If discovery doesn't work on
+your network, for example because Homebridge runs in Docker without host
+networking, turn off `localDiscovery` and list each thermostat's address in
+`localDevices` instead, giving it a fixed IP address (a DHCP reservation).
+Listed thermostats and discovered ones can be combined; a thermostat found both
+ways is only added once.
 
 The Local API supports less than the cloud API. In local mode you get mode,
 heating/cooling setpoints, display units, indoor temperature and humidity, the
@@ -135,8 +141,8 @@ switching modes only means changing `connectionMode`; the other mode's settings
 are ignored. Switching also keeps your existing accessories, along with their
 rooms, scenes and automations. The plugin matches each thermostat to its
 existing accessories by the thermostat's name. If two thermostats share a
-name, set `deviceId` on each local entry to the Serial Number shown for that
-thermostat's existing accessories. Accessories removed in local mode come
+name, list each one in `localDevices` with its `deviceId` set to the Serial
+Number shown for that thermostat's existing accessories. Accessories removed in local mode come
 back as new accessories when you switch back to cloud mode.
 
 The Local API has no authentication, so anything on your network can control

@@ -18,6 +18,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   Air fan (on/off). Accessories it can't support are removed.
 - Switching between cloud and local mode keeps existing accessories: devices
   are matched to them by name, or by an optional per-thermostat Device ID.
+- Local mode finds thermostats automatically via mDNS (Discover Thermostats
+  Automatically, on by default) and follows a thermostat whose IP address
+  changes. Thermostats can still be listed by address, and must be when
+  discovery is off.
 
 ### Changed
 - Daikin credentials are only required in cloud mode.

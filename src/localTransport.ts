@@ -1,6 +1,7 @@
 import { Logging } from 'homebridge';
 import { EquipmentStatus, LocalDeviceConfig, Thermostat, ThermostatData, ThermostatUpdate } from './types.js';
 import { DaikinTransport, TransportCapabilities, TransportTiming, logError } from './daikinTransport.js';
+import { DiscoveredThermostat, discoverThermostats } from './localDiscovery.js';
 
 /** GET / */
 interface LocalIdentity {
@@ -35,6 +36,9 @@ interface LocalDevice {
   baseUrl: string;
   identity: LocalIdentity;
   thermostat: Thermostat;
+  /** Known when the device was seen via mDNS, so a changed IP address can be found again. */
+  mac?: string;
+  lastRediscoveryMs: number;
 }
 
 const LOCAL_TIMING: TransportTiming = {
@@ -53,6 +57,10 @@ const LOCAL_CAPABILITIES: TransportCapabilities = {
 };
 
 const REQUEST_TIMEOUT_MS = 5 * 1000;
+
+const DISCOVERY_TIMEOUT_MS = 5 * 1000;
+
+const REDISCOVERY_INTERVAL_MS = 60 * 1000;
 
 const SUPPORTED_API_VERSION = 1;
 
@@ -94,24 +102,98 @@ export class LocalTransport implements DaikinTransport {
 
   public constructor(
     private readonly configs: LocalDeviceConfig[],
+    private readonly discovery: boolean,
     private readonly log: Logging,
   ) {}
 
   public async initialize(): Promise<boolean> {
     this._devices.clear();
+    let configuredFound = 0;
     for (const config of this.configs) {
-      const device = await this.probe(config);
+      const device = await this.probe(config.host, config.port, config.deviceId ?? `local-${config.host}`);
+      if (device) {
+        this._devices.set(device.thermostat.id, device);
+        configuredFound++;
+      }
+    }
+    if (configuredFound < this.configs.length) {
+      this.log.warn('Some configured thermostats did not respond and will not be loaded until Homebridge restarts.');
+    }
+
+    if (this.discovery) {
+      await this.addDiscoveredDevices();
+    }
+
+    if (this._devices.size === 0) {
+      this.log.error(
+        this.discovery
+          ? 'No thermostats found. Check that the Local API is turned on, or add thermostats by host.'
+          : 'No configured thermostats responded to the local API.',
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private async addDiscoveredDevices() {
+    const discovered = await this.discover();
+    if (discovered.length === 0) {
+      this.log.info(
+        'No thermostats found via mDNS. If Homebridge runs in Docker, it needs host networking for discovery; ' +
+          'otherwise add thermostats by host.',
+      );
+      return;
+    }
+    for (const found of discovered) {
+      if (this.isConfigured(found)) {
+        const configured = [...this._devices.values()].find(
+          device => device.baseUrl === `http://${found.host}:${found.port}` || device.baseUrl === `http://${found.hostname}:${found.port}`,
+        );
+        if (configured) {
+          configured.mac = found.mac;
+        }
+        continue;
+      }
+      const device = await this.probe(found.host, found.port, `local-${found.mac.replace(/:/g, '')}`, found.mac);
       if (device) {
         this._devices.set(device.thermostat.id, device);
       }
     }
-    if (this._devices.size === 0) {
-      this.log.error('No configured thermostats responded to the local API.');
+  }
+
+  private async discover(): Promise<DiscoveredThermostat[]> {
+    try {
+      return await discoverThermostats(DISCOVERY_TIMEOUT_MS, this.log);
+    } catch (error) {
+      logError(this.log, 'mDNS discovery failed:', error);
+      return [];
+    }
+  }
+
+  private isConfigured(found: DiscoveredThermostat): boolean {
+    return this.configs.some(config => {
+      const host = config.host.toLowerCase();
+      return host === found.host || host === found.hostname.toLowerCase();
+    });
+  }
+
+  /** Looks a discovered device up again by MAC, at most once a minute, and follows a changed address. */
+  private async rediscover(device: LocalDevice): Promise<boolean> {
+    const now = Date.now();
+    if (!device.mac || now - device.lastRediscoveryMs < REDISCOVERY_INTERVAL_MS) {
       return false;
     }
-    if (this._devices.size < this.configs.length) {
-      this.log.warn('Some configured thermostats did not respond and will not be loaded until Homebridge restarts.');
+    device.lastRediscoveryMs = now;
+    const found = (await this.discover()).find(candidate => candidate.mac === device.mac);
+    if (!found) {
+      return false;
     }
+    const baseUrl = `http://${found.host}:${found.port}`;
+    if (baseUrl === device.baseUrl) {
+      return false;
+    }
+    this.log.info('Thermostat %s moved from %s to %s.', device.thermostat.name, device.baseUrl, baseUrl);
+    device.baseUrl = baseUrl;
     return true;
   }
 
@@ -125,7 +207,10 @@ export class LocalTransport implements DaikinTransport {
       this.log.error('No local thermostat configured for device: %s', deviceId);
       return undefined;
     }
-    const info = await this.getJson<LocalInfo>(`${device.baseUrl}/query/info`);
+    let info = await this.getJson<LocalInfo>(`${device.baseUrl}/query/info`);
+    if (!info && (await this.rediscover(device))) {
+      info = await this.getJson<LocalInfo>(`${device.baseUrl}/query/info`);
+    }
     return info ? this.toThermostatData(device.identity, info) : undefined;
   }
 
@@ -163,8 +248,8 @@ export class LocalTransport implements DaikinTransport {
     return true;
   }
 
-  private async probe(config: LocalDeviceConfig): Promise<LocalDevice | undefined> {
-    const baseUrl = `http://${config.host}:${config.port}`;
+  private async probe(host: string, port: number, id: string, mac?: string): Promise<LocalDevice | undefined> {
+    const baseUrl = `http://${host}:${port}`;
     const identity = await this.getJson<LocalIdentity>(`${baseUrl}/`);
     const info = identity ? await this.getJson<LocalInfo>(`${baseUrl}/query/info`) : undefined;
     if (!identity || !info) {
@@ -183,8 +268,10 @@ export class LocalTransport implements DaikinTransport {
     return {
       baseUrl,
       identity,
+      mac,
+      lastRediscoveryMs: 0,
       thermostat: {
-        id: config.deviceId ?? `local-${config.host}`,
+        id,
         name: info.name,
         model: identity.model,
         firmwareVersion: identity.firmware,

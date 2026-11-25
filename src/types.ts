@@ -279,6 +279,8 @@ export interface DaikinOptions {
   user: string;
   password: string;
   localDevices: LocalDeviceConfig[];
+  /** Find Local API thermostats on the network via mDNS, in addition to localDevices. */
+  localDiscovery: boolean;
   includeDeviceName: boolean;
   name: string;
   enableEmergencyHeatSwitch: boolean;
