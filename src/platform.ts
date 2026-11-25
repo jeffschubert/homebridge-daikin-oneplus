@@ -55,13 +55,17 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     const connectionMode = config.connectionMode === 'local' ? 'local' : 'cloud';
     const localDevices = parseLocalDevices(config.localDevices);
+    const localDiscovery = config.localDiscovery !== false;
     if (connectionMode === 'cloud') {
       assert(
         typeof config.user === 'string' && config.user.length > 0 && typeof config.password === 'string' && config.password.length > 0,
         'No valid Daikin login credentials configured.',
       );
     } else {
-      assert(localDevices.length > 0, 'Local mode is selected but no thermostats with a host are configured.');
+      assert(
+        localDiscovery || localDevices.length > 0,
+        'Local mode is selected with discovery turned off, but no thermostats with a host are configured.',
+      );
     }
 
     assert(typeof config.name === 'string', 'No valid name configured.');
@@ -76,6 +80,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       user: typeof config.user === 'string' ? config.user : '',
       password: typeof config.password === 'string' ? config.password : '',
       localDevices,
+      localDiscovery,
       name: config.name,
       includeDeviceName: !!config.includeDeviceName,
       enableEmergencyHeatSwitch: !!config.enableEmergencyHeatSwitch,
@@ -117,7 +122,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     const transport: DaikinTransport =
       this.config.connectionMode === 'local'
-        ? new LocalTransport(this.config.localDevices, this.log)
+        ? new LocalTransport(this.config.localDevices, this.config.localDiscovery, this.log)
         : new CloudTransport(this.config.user, this.config.password, this.log);
     this.log.info('Using %s connection mode.', this.config.connectionMode);
     this.daikinApi = new DaikinApi(transport, this.log, this.config.logRaw, this.historyStore, () => this.cachedDevices());

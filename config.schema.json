@@ -19,19 +19,30 @@
           ]
         },
         "then": {
-          "required": [
-            "localDevices"
-          ],
-          "properties": {
-            "localDevices": {
-              "minItems": 1,
-              "items": {
-                "required": [
-                  "host"
-                ],
-                "properties": {
-                  "host": {
-                    "minLength": 1
+          "if": {
+            "properties": {
+              "localDiscovery": {
+                "const": false
+              }
+            },
+            "required": [
+              "localDiscovery"
+            ]
+          },
+          "then": {
+            "required": [
+              "localDevices"
+            ],
+            "properties": {
+              "localDevices": {
+                "contains": {
+                  "required": [
+                    "host"
+                  ],
+                  "properties": {
+                    "host": {
+                      "minLength": 1
+                    }
                   }
                 }
               }
@@ -97,22 +108,28 @@
           "type": "password"
         }
       },
+      "localDiscovery": {
+        "title": "Discover Thermostats Automatically",
+        "type": "boolean",
+        "default": true,
+        "description": "Find thermostats on your network using mDNS, and follow them if their IP address changes. Turn on the Local API at each thermostat under Settings > Wi-Fi > Local API. If Homebridge runs in Docker, discovery needs host networking."
+      },
       "localDevices": {
         "title": "Local Thermostats",
         "type": "array",
-        "description": "Required in Local mode. Turn on the Local API at each thermostat under Settings > Wi-Fi > Local API. Giving each thermostat a fixed IP address (a DHCP reservation) is recommended.",
+        "description": "Thermostats to add by address, in addition to any discovered. Required in Local mode when discovery is off. Give these thermostats a fixed IP address (a DHCP reservation).",
         "items": {
           "type": "object",
           "properties": {
             "host": {
               "title": "Host",
               "type": "string",
-              "description": "IP address or hostname of the thermostat, e.g. 192.168.1.52. Required in Local mode."
+              "description": "IP address or hostname of the thermostat, e.g. 192.168.1.52. Rows without a host are ignored."
             },
             "port": {
               "title": "Port",
               "type": "integer",
-              "default": 80,
+              "description": "Leave empty for the default, 80.",
               "minimum": 1,
               "maximum": 65535
             },
@@ -406,6 +423,7 @@
       "expanded": false,
       "description": "Thermostats reached directly on your network, used in Local mode.",
       "items": [
+        "localDiscovery",
         {
           "key": "localDevices",
           "type": "array",
