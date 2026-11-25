@@ -8,10 +8,13 @@ import { DaikinOnePlusScheduleSwitch } from './platformScheduleSwitch.js';
 import { DaikinOnePlusAwaySwitch } from './platformAwaySwitch.js';
 import { DaikinOnePlusStateSwitch } from './platformStateSwitch.js';
 import { DaikinApi } from './daikinapi.js';
+import { CloudTransport } from './cloudTransport.js';
+import { LocalTransport } from './localTransport.js';
+import { DaikinTransport } from './daikinTransport.js';
 import { DaikinOnePlusEmergencyHeatSwitch } from './platformEmergencyHeatSwitch.js';
 import { DaikinOnePlusOneCleanFan } from './platformOneCleanFan.js';
 import { DaikinOnePlusCirculateAirFan } from './platformCirculateAirFan.js';
-import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions, EquipmentStatus } from './types.js';
+import { AccessoryContext, Thermostat, ThermostatData, DaikinOptions, EquipmentStatus, LocalDeviceConfig } from './types.js';
 import { DaikinOnePlusOutdoorTemperature } from './platformOutdoorTemperature.js';
 import assert from 'node:assert';
 import { discoverZones, thermostatIdentity } from './zones.js';
@@ -54,10 +57,20 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       throw new Error('No configuration found.');
     }
 
-    assert(
-      typeof config.user === 'string' && config.user.length > 0 && typeof config.password === 'string' && config.password.length > 0,
-      'No valid Daikin login credentials configured.',
-    );
+    const connectionMode = config.connectionMode === 'local' ? 'local' : 'cloud';
+    const localDevices = parseLocalDevices(config.localDevices);
+    const localDiscovery = config.localDiscovery !== false;
+    if (connectionMode === 'cloud') {
+      assert(
+        typeof config.user === 'string' && config.user.length > 0 && typeof config.password === 'string' && config.password.length > 0,
+        'No valid Daikin login credentials configured.',
+      );
+    } else {
+      assert(
+        localDiscovery || localDevices.length > 0,
+        'Local mode is selected with discovery turned off, but no thermostats with a host are configured.',
+      );
+    }
 
     assert(typeof config.name === 'string', 'No valid name configured.');
 
@@ -68,8 +81,11 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.config = {
       enableAdditionalZoneControls: config.enableAdditionalZoneControls === true,
       debug: !!config.debug,
-      user: config.user,
-      password: config.password,
+      connectionMode,
+      user: typeof config.user === 'string' ? config.user : '',
+      password: typeof config.password === 'string' ? config.password : '',
+      localDevices,
+      localDiscovery,
       name: config.name,
       includeDeviceName: !!config.includeDeviceName,
       enableEmergencyHeatSwitch: !!config.enableEmergencyHeatSwitch,
@@ -109,12 +125,17 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
 
     this.historyStore = new HistoryStore(this.log, this.config);
 
+    const transport: DaikinTransport =
+      this.config.connectionMode === 'local'
+        ? new LocalTransport(this.config.localDevices, this.config.localDiscovery, this.log)
+        : new CloudTransport(this.config.user, this.config.password, this.log);
+    this.log.info('Using %s connection mode.', this.config.connectionMode);
     this.daikinApi = new DaikinApi(
-      this.config.user,
-      this.config.password,
+      transport,
       this.log,
       this.config.logRaw,
       this.historyStore,
+      () => this.cachedDevices(),
       this.config.enableAdditionalZoneControls,
     );
 
@@ -171,17 +192,41 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.accessories.push(accessory);
   }
 
+  private cachedDevices(): Thermostat[] {
+    const devices = new Map<string, Thermostat>();
+    for (const accessory of this.accessories) {
+      const device = accessory.context.device;
+      if (device?.id && !devices.has(device.id)) {
+        devices.set(device.id, device);
+      }
+    }
+    return [...devices.values()];
+  }
+
+  private logUnavailableFeatures() {
+    const capabilities = this.daikinApi.capabilities;
+    const unavailable = [
+      [!this.config.ignoreOutdoorTemp && !capabilities.outdoorSensors, 'outdoor temperature'],
+      [!this.config.ignoreOutdoorHumSensor && !capabilities.outdoorSensors, 'outdoor humidity'],
+      [this.config.enableScheduleSwitch && !capabilities.schedule, 'schedule switch'],
+      [this.config.enableAwaySwitch && !capabilities.away, 'away switch'],
+      [this.config.enableOneCleanFan && !capabilities.oneClean, 'One Clean fan'],
+      [this.config.enableCirculateAirFan && !capabilities.circulateFanSpeed, 'circulate air fan speed'],
+      [!capabilities.targetHumidity, 'target humidity'],
+    ]
+      .filter(([enabled]) => enabled)
+      .map(([, feature]) => feature);
+    if (unavailable.length > 0) {
+      this.log.info('Not available in %s mode: %s.', this.config.connectionMode, unavailable.join(', '));
+    }
+  }
+
   /**
    * This is an example method showing how to register discovered accessories.
    * Accessories must only be registered once, previously created accessories
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   private async discoverDevices() {
-    if (!this.config.user && !this.config.password) {
-      this.log.error('Credentials not set. Aborting discovery of devices.');
-      return;
-    }
-
     if (!this.daikinApi.isInitialized()) await this.daikinApi.Initialize();
 
     if (!this.daikinApi.isInitialized()) {
@@ -189,6 +234,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
       return;
     }
     const devices = this.daikinApi.getDeviceList();
+    this.logUnavailableFeatures();
 
     // loop over the discovered devices and register each one if it has not already been registered
     for (const device of devices) {
@@ -251,7 +297,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for One Clean Fan...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if (this.config.enableOneCleanFan) {
+    if (this.config.enableOneCleanFan && this.daikinApi.capabilities.oneClean) {
       const dName = this.accessoryName(device, 'One Clean');
       if (existingAccessory) {
         // the accessory already exists
@@ -309,7 +355,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for Schedule Switch...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if (this.config.enableScheduleSwitch) {
+    if (this.config.enableScheduleSwitch && this.daikinApi.capabilities.schedule) {
       const dName = this.accessoryName(device, 'Schedule State');
       if (existingAccessory) {
         // the accessory already exists
@@ -338,7 +384,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for Away Switch...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if (this.config.enableAwaySwitch) {
+    if (this.config.enableAwaySwitch && this.daikinApi.capabilities.away) {
       const dName = this.accessoryName(device, 'Away State');
       if (existingAccessory) {
         // the accessory already exists
@@ -473,7 +519,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     this.log.debug('Checking for outdoor humidity sensor...');
     const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-    if (!this.config.ignoreOutdoorHumSensor) {
+    if (!this.config.ignoreOutdoorHumSensor && this.daikinApi.capabilities.outdoorSensors) {
       const dName = this.accessoryName(device, 'Outdoor Humidity');
       if (existingAccessory) {
         // the accessory already exists
@@ -551,7 +597,7 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     const uuid = this.api.hap.uuid.generate(`${device.id}_otemp`);
     this.log.debug('checking for Outdoor Temperature...');
     const existingaccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-    if (!this.config.ignoreOutdoorTemp) {
+    if (!this.config.ignoreOutdoorTemp && this.daikinApi.capabilities.outdoorSensors) {
       const dname = this.accessoryName(device, 'Outdoor Temperature');
       if (existingaccessory) {
         // the accessory already exists
@@ -613,3 +659,30 @@ export class DaikinOnePlusPlatform implements DynamicPlatformPlugin {
     }
   }
 }
+
+const parseLocalDevices = (value: unknown): LocalDeviceConfig[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const devices: LocalDeviceConfig[] = [];
+  for (const entry of value as Record<string, unknown>[]) {
+    const host =
+      typeof entry?.host === 'string'
+        ? entry.host
+            .trim()
+            .replace(/^https?:\/\//i, '')
+            .replace(/\/+$/, '')
+        : '';
+    if (!host) {
+      continue;
+    }
+    const port = Number(entry.port);
+    const deviceId = typeof entry.deviceId === 'string' ? entry.deviceId.trim() : '';
+    devices.push({
+      host,
+      port: Number.isInteger(port) && port > 0 ? port : 80,
+      deviceId: deviceId || undefined,
+    });
+  }
+  return devices;
+};

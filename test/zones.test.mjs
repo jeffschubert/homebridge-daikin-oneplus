@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DaikinApi } from '../dist/daikinapi.js';
+import { CloudTransport } from '../dist/cloudTransport.js';
 import { discoverZones, zoneData, zoneField, thermostatIdentity } from '../dist/zones.js';
 import { HistoryStore } from '../dist/historyStore.js';
 
@@ -15,11 +16,12 @@ const fixture = () => ({ tempIndoor: 19.6, humIndoor: 52, hspActive: 19.4, cspAc
 const device = (id = 'synthetic-a', data = fixture()) => ({ id, name: 'Main Room', model: 'ONEPLUS', firmwareVersion: '4.1.6', data });
 const history = { async record() {} };
 function setup(t, controls = true, devices = [device()]) {
-  const api = new DaikinApi('', '', log, false, history, controls);
+  const transport = new CloudTransport('', '', log);
+  transport._token = { accessToken: 'synthetic-token' };
+  transport._tokenExpiration = new Date(Date.now() + 3600000);
+  const api = new DaikinApi(transport, log, false, history, undefined, controls);
   api._devices = new Map(devices.map(d => [d.id, d]));
   for (const d of devices) api.readTimes.set(d.id, Date.now());
-  api._token = { accessToken: 'synthetic-token' };
-  api._tokenExpiration = new Date(Date.now() + 3600000);
   const requests = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     requests.push({ url, body: options?.body && JSON.parse(options.body), method: options?.method });
@@ -105,7 +107,7 @@ test('concurrent zones and devices cannot mix; same-zone threshold writes serial
 
 test('controls default off: no PUT or optimistic changes, including mode', async t => {
   const { api, requests } = setup(t, false);
-  const defaultApi = new DaikinApi('', '', log, false, history);
+  const defaultApi = new DaikinApi(new CloudTransport('', '', log), log, false, history);
   await assert.rejects(defaultApi.setTargetState('synthetic-a', 1, 2), /disabled/);
   defaultApi.destroy();
   await assert.rejects(api.setTargetTemps('synthetic-a', undefined, 20, undefined, 2), /disabled/);
@@ -330,4 +332,20 @@ test('legacy names and ignoreThermostat work for restored accessories without zo
   platform.config.ignoreThermostat = true;
   platform.discoverThermostat(d);
   assert.equal(removed[0], restored);
+});
+
+test('setpoint writes skip the schedule hold when the transport has no schedule', async t => {
+  const writes = [];
+  const transport = {
+    timing: { writeDelayMs: 2000, foregroundRefreshMs: 5000, backgroundRefreshMs: 60000 },
+    capabilities: { outdoorSensors: false, schedule: false, away: false, oneClean: false, circulateFanSpeed: false, targetHumidity: false },
+    write: async (_id, update) => { writes.push(update); return true; },
+  };
+  const api = new DaikinApi(transport, log, false, history);
+  const { schedEnabled, ...data } = fixture();
+  api._devices = new Map([['synthetic-a', device('synthetic-a', data)]]);
+  api.readTimes.set('synthetic-a', Date.now());
+  t.after(() => api.destroy());
+  assert.equal(await api.setTargetTemps('synthetic-a', undefined, 20), true);
+  assert.deepEqual(writes, [{ hspHome: 20, cspHome: 23.9 }]);
 });

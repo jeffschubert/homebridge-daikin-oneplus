@@ -2,10 +2,69 @@
   "pluginAlias": "DaikinOnePlus",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "All devices associated with the configured Daikin account will be loaded as accessories.\nYou must have a Daikin One+ Smart Thermostat and Daikin cloud account for this plugin to work.",
+  "headerDisplay": "Requires a Daikin One+ Smart Thermostat. In Cloud mode, all devices associated with the configured Daikin account are loaded as accessories. In Local mode, the thermostats listed below are reached directly on your network using the Daikin One Local API, with fewer features.",
   "footerDisplay": "See the [homebridge-daikin-oneplus](https://github.com/jeffschubert/homebridge-daikin-oneplus) developer page for detailed documentation, and to submit feature requests and bug reports.",
   "schema": {
     "type": "object",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "connectionMode": {
+              "const": "local"
+            }
+          },
+          "required": [
+            "connectionMode"
+          ]
+        },
+        "then": {
+          "if": {
+            "properties": {
+              "localDiscovery": {
+                "const": false
+              }
+            },
+            "required": [
+              "localDiscovery"
+            ]
+          },
+          "then": {
+            "required": [
+              "localDevices"
+            ],
+            "properties": {
+              "localDevices": {
+                "contains": {
+                  "required": [
+                    "host"
+                  ],
+                  "properties": {
+                    "host": {
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "else": {
+          "required": [
+            "user",
+            "password"
+          ],
+          "properties": {
+            "user": {
+              "minLength": 1
+            },
+            "password": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ],
     "properties": {
       "name": {
         "title": "Name",
@@ -13,10 +72,30 @@
         "required": true,
         "default": "Daikin One Plus"
       },
+      "connectionMode": {
+        "title": "Connection Mode",
+        "type": "string",
+        "description": "Cloud uses your Daikin account and supports every feature. Local talks to each thermostat directly on your network and supports only mode, setpoint, fan on/off, display units and indoor temperature/humidity. Fill in the matching connection section below. Settings for the other mode are kept, so switching is just this dropdown, and existing accessories are kept too.",
+        "default": "cloud",
+        "oneOf": [
+          {
+            "title": "Cloud (Daikin account)",
+            "enum": [
+              "cloud"
+            ]
+          },
+          {
+            "title": "Local (Daikin One Local API)",
+            "enum": [
+              "local"
+            ]
+          }
+        ]
+      },
       "user": {
         "title": "Daikin Username",
         "type": "string",
-        "required": true,
+        "description": "Required in Cloud mode.",
         "x-schema-form": {
           "type": "username"
         }
@@ -24,9 +103,42 @@
       "password": {
         "title": "Daikin Password",
         "type": "string",
-        "required": true,
+        "description": "Required in Cloud mode.",
         "x-schema-form": {
           "type": "password"
+        }
+      },
+      "localDiscovery": {
+        "title": "Discover Thermostats Automatically",
+        "type": "boolean",
+        "default": true,
+        "description": "Find thermostats on your network using mDNS, and follow them if their IP address changes. Turn on the Local API at each thermostat under Settings > Wi-Fi > Local API. If Homebridge runs in Docker, discovery needs host networking."
+      },
+      "localDevices": {
+        "title": "Local Thermostats",
+        "type": "array",
+        "description": "Thermostats to add by address, in addition to any discovered. Required in Local mode when discovery is off. Give these thermostats a fixed IP address (a DHCP reservation).",
+        "items": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "title": "Host",
+              "type": "string",
+              "description": "IP address or hostname of the thermostat, e.g. 192.168.1.52. Rows without a host are ignored."
+            },
+            "port": {
+              "title": "Port",
+              "type": "integer",
+              "description": "Leave empty for the default, 80.",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "deviceId": {
+              "title": "Device ID",
+              "type": "string",
+              "description": "Optional. Existing accessories are matched to a thermostat by name automatically. Only set this to override that, using the Serial Number shown for the thermostat's existing accessories."
+            }
+          }
         }
       },
       "debug": {
@@ -295,12 +407,41 @@
       "expandable": true,
       "expanded": true,
       "items": [
+        "name",
+        "connectionMode"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Cloud Connection",
+      "expandable": true,
+      "expanded": false,
+      "description": "Your Daikin account, used in Cloud mode.",
+      "items": [
+        "user",
+        "password"
+      ]
+    },
+    {
+      "type": "section",
+      "title": "Local Connection",
+      "expandable": true,
+      "expanded": false,
+      "description": "Thermostats reached directly on your network, used in Local mode.",
+      "items": [
+        "localDiscovery",
         {
-          "description": "Enter your Daikin credentials here.",
+          "key": "localDevices",
+          "type": "array",
+          "orderable": false,
+          "buttonText": "Add Thermostat",
           "items": [
-            "user",
-            "password",
-            "name"
+            "localDevices[].host",
+            {
+              "key": "localDevices[].port",
+              "type": "number"
+            },
+            "localDevices[].deviceId"
           ]
         }
       ]

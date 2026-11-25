@@ -77,12 +77,14 @@ export class DaikinOnePlusThermostat {
         return daikinApi.setDisplayUnits(deviceId, Number(value));
       },
     );
-    if (zone === 1)
+    if (zone === 1 && daikinApi.capabilities.targetHumidity)
       this.bind(
         'TargetRelativeHumidity',
         () => this.read('humSP', 0, 100),
         value => daikinApi.setTargetHumidity(deviceId, Number(value)),
       );
+    else if (this.service.testCharacteristic(C.TargetRelativeHumidity))
+      this.service.removeCharacteristic(this.service.getCharacteristic(C.TargetRelativeHumidity));
     daikinApi.addListener(deviceId, this.listener);
   }
 

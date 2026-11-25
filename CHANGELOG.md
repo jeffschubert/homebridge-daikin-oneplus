@@ -8,6 +8,27 @@ change — and dependency bumps, formatting and other housekeeping are left out.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- Local mode: set Connection Mode to Local to control thermostats directly
+  on your network through the Daikin One Local API, without the Daikin cloud
+  (#80). Local mode supports mode, setpoints, display units, indoor
+  temperature and humidity, state switches, emergency heat and the Circulate
+  Air fan (on/off). Accessories it can't support are removed.
+- Switching between cloud and local mode keeps existing accessories: devices
+  are matched to them by name, or by an optional per-thermostat Device ID.
+- Local mode finds thermostats automatically via mDNS (Discover Thermostats
+  Automatically, on by default) and follows a thermostat whose IP address
+  changes. Thermostats can still be listed by address, and must be when
+  discovery is off.
+
+### Changed
+- Daikin credentials are only required in cloud mode.
+- The settings form groups the Daikin login and the local thermostat list into
+  Cloud Connection and Local Connection sections. Both are kept when switching
+  modes, and the form warns when the selected mode's settings are missing.
+
 ## 4.2.0 — 2026-09-24
 
 ### Added
