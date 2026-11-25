@@ -1,6 +1,6 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
-import { AccessoryContext, ThermostatMode } from './types.js';
+import { AccessoryContext, EquipmentStatus, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
 import { assertWritten } from './writeResult.js';
 
@@ -154,15 +154,14 @@ export class DaikinOnePlusThermostat {
    * Handle requests to get the current value of the "Current Heating Cooling State" characteristic
    */
   private handleCurrentHeatingCoolingStateGet(): CharacteristicValue {
-    //"equipmentStatus": the running state of the system, 1=cooling, 2=overcool dehumidifying, 3=heating, 4=fan, 5=idle,
-    // set this to a valid value for CurrentHeatingCoolingState
+    // HomeKit has no fan-only or dehumidify state; overcooling runs the compressor, so it shows as cooling.
     let currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.OFF;
-    const currentStatus = this.daikinApi.getCurrentStatus(this.deviceId);
-    switch (currentStatus) {
-      case 1:
+    switch (this.daikinApi.getCurrentStatus(this.deviceId)) {
+      case EquipmentStatus.COOLING:
+      case EquipmentStatus.OVERCOOL_DEHUMIDIFYING:
         currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.COOL;
         break;
-      case 3:
+      case EquipmentStatus.HEATING:
         currentValue = this.platform.Characteristic.CurrentHeatingCoolingState.HEAT;
         break;
     }
