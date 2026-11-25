@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
+import { assertWritten } from './writeResult.js';
 
 /**
  * Platform Accessory
@@ -58,6 +59,6 @@ export class DaikinOnePlusScheduleSwitch {
    */
   private async handleCurrentStateSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Schedule State: %s', this.accessory.displayName, value);
-    await this.daikinApi.setScheduleState(this.deviceId, Boolean(value));
+    assertWritten(this.platform, await this.daikinApi.setScheduleState(this.deviceId, Boolean(value)));
   }
 }

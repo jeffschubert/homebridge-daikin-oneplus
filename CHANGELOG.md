@@ -28,6 +28,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 - The settings form groups the Daikin login and the local thermostat list into
   Cloud Connection and Local Connection sections. Both are kept when switching
   modes, and the form warns when the selected mode's settings are missing.
+- A change that doesn't go through (rejected by Daikin, a network error, or
+  no data yet) now shows an error in the Home app instead of appearing to
+  succeed until the next refresh, and automations see it as failed (#85). A
+  failed mode change no longer leaves the new mode showing.
 
 ## 4.2.0 — 2026-09-24
 

@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
+import { assertWritten } from './writeResult.js';
 
 /**
  * One Clean Fan
@@ -61,6 +62,9 @@ export class DaikinOnePlusOneCleanFan {
    */
   private async handleActiveSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set OneClean Fan State: %s', this.accessory.displayName, value);
-    await this.daikinApi.setOneCleanFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
+    assertWritten(
+      this.platform,
+      await this.daikinApi.setOneCleanFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE),
+    );
   }
 }

@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
+import { assertWritten } from './writeResult.js';
 
 /**
  * Emergency Heat Switch
@@ -66,6 +67,9 @@ export class DaikinOnePlusEmergencyHeatSwitch {
     this.platform.log.debug('%s - Set Emergency Heat State: %s', this.accessory.displayName, value);
     // Record intent FIRST (synchronously) so thermostat mode changes can honor it
     this.daikinApi.setEmergencyHeatEnabled(this.deviceId, !!value);
-    await this.daikinApi.setTargetState(this.deviceId, value ? ThermostatMode.EMERGENCY_HEAT : ThermostatMode.HEAT);
+    assertWritten(
+      this.platform,
+      await this.daikinApi.setTargetState(this.deviceId, value ? ThermostatMode.EMERGENCY_HEAT : ThermostatMode.HEAT),
+    );
   }
 }
