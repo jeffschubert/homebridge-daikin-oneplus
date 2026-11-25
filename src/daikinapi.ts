@@ -567,9 +567,14 @@ export class DaikinApi {
     const requestedData = {
       mode: requestedState,
     };
+    const previousMode = this._devices.get(deviceId)?.data?.mode;
     // Update cache immediately so subsequent commands (e.g., setTargetTemps from a scene) see the new mode
     this._updateCache(deviceId, { mode: requestedState });
-    return this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
+    const success = await this.putRequest(deviceId, requestedData, 'setTargetState', 'Error updating target state:');
+    if (!success && previousMode !== undefined && this._devices.get(deviceId)?.data?.mode === requestedState) {
+      this._updateCache(deviceId, { mode: previousMode });
+    }
+    return success;
   }
 
   public async setOneCleanFanActive(deviceId: string, requestedState: boolean): Promise<boolean> {

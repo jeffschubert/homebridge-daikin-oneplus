@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext, ThermostatMode } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
+import { assertWritten } from './writeResult.js';
 
 /**
  * Thermostat
@@ -333,7 +334,7 @@ export class DaikinOnePlusThermostat {
         break;
     }
 
-    await this.daikinApi.setTargetState(this.deviceId, requestedState);
+    assertWritten(this.platform, await this.daikinApi.setTargetState(this.deviceId, requestedState));
   }
 
   /**
@@ -341,7 +342,7 @@ export class DaikinOnePlusThermostat {
    */
   private async handleTargetTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TargetTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, Number(value));
+    assertWritten(this.platform, await this.daikinApi.setTargetTemps(this.deviceId, Number(value)));
   }
 
   /**
@@ -349,7 +350,7 @@ export class DaikinOnePlusThermostat {
    */
   private async handleCoolingThresholdTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set CoolingThresholdTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, undefined, undefined, Number(value));
+    assertWritten(this.platform, await this.daikinApi.setTargetTemps(this.deviceId, undefined, undefined, Number(value)));
   }
 
   /**
@@ -357,7 +358,7 @@ export class DaikinOnePlusThermostat {
    */
   private async handleHeatingThresholdTemperatureSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set HeatingThresholdTemperature: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetTemps(this.deviceId, undefined, Number(value), undefined);
+    assertWritten(this.platform, await this.daikinApi.setTargetTemps(this.deviceId, undefined, Number(value), undefined));
   }
 
   /**
@@ -376,7 +377,7 @@ export class DaikinOnePlusThermostat {
       default:
         requestedUnits = 0;
     }
-    await this.daikinApi.setDisplayUnits(this.deviceId, requestedUnits);
+    assertWritten(this.platform, await this.daikinApi.setDisplayUnits(this.deviceId, requestedUnits));
   }
 
   /**
@@ -384,6 +385,6 @@ export class DaikinOnePlusThermostat {
    */
   private async handleTargetHumiditySet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set TargetHumidity: %s', this.accessory.displayName, value);
-    await this.daikinApi.setTargetHumidity(this.deviceId, Number(value));
+    assertWritten(this.platform, await this.daikinApi.setTargetHumidity(this.deviceId, Number(value)));
   }
 }

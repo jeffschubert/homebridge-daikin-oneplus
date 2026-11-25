@@ -2,6 +2,7 @@ import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { DaikinApi } from './daikinapi.js';
 import { AccessoryContext } from './types.js';
 import { DaikinOnePlusPlatform } from './platform.js';
+import { assertWritten } from './writeResult.js';
 
 /**
  * Circulate Air Fan
@@ -78,7 +79,10 @@ export class DaikinOnePlusCirculateAirFan {
    */
   private async handleActiveSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Circulate Air Fan State: %s', this.accessory.displayName, value);
-    await this.daikinApi.setCirculateAirFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE);
+    assertWritten(
+      this.platform,
+      await this.daikinApi.setCirculateAirFanActive(this.deviceId, value === this.platform.Characteristic.Active.ACTIVE),
+    );
   }
 
   /**
@@ -111,6 +115,6 @@ export class DaikinOnePlusCirculateAirFan {
   private async handleSpeedSet(value: CharacteristicValue) {
     this.platform.log.debug('%s - Set Circulate Air Fan Speed: %s', this.accessory.displayName, value);
     const newSpeed = Number(value) - 1;
-    await this.daikinApi.setCirculateAirFanSpeed(this.deviceId, newSpeed);
+    assertWritten(this.platform, await this.daikinApi.setCirculateAirFanSpeed(this.deviceId, newSpeed));
   }
 }
