@@ -11,7 +11,8 @@ import {
   ThermostatMode,
 } from './types.js';
 import { HistoryStore } from './historyStore.js';
-import { DaikinTransport, logError } from './daikinTransport.js';
+import { DaikinTransport, TransportCapabilities, logError } from './daikinTransport.js';
+import { resolveDeviceIds } from './deviceIdentity.js';
 
 type DataChanged = () => void;
 
@@ -27,6 +28,8 @@ const readIdField = (value: string | undefined): string | undefined => {
 
 export class DaikinApi {
   private _devices: Map<string, Thermostat> = new Map(); // cache of all devices (thermostats) and their state
+  // Devices are keyed by a stable ID that survives switching transports; this maps it to the transport's own ID.
+  private _transportIds: Map<string, string> = new Map();
   private _isInitialized = false;
   private _listeners: Map<string, Set<DataChanged>> = new Map();
 
@@ -56,7 +59,16 @@ export class DaikinApi {
   // Devices whose data shape isn't recognized. Warned about once, then skipped.
   private _unsupportedDevices: Set<string> = new Set();
 
-  public constructor(transport: DaikinTransport, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
+  /**
+   * @param knownDevices devices that already have accessories, used to keep their IDs when the transport's IDs differ
+   */
+  public constructor(
+    transport: DaikinTransport,
+    log: Logging,
+    logRaw: boolean,
+    historyStore: HistoryStore,
+    private readonly knownDevices: () => Thermostat[] = () => [],
+  ) {
     this.transport = transport;
     this.log = log;
     this.logRaw = logRaw;
@@ -212,12 +224,12 @@ export class DaikinApi {
       // just got data
       blockUntilMs = this.transport.timing.foregroundRefreshMs;
       nextUpdateInMs = this.transport.timing.backgroundRefreshMs;
+    } else if (blockUntilMs === this.transport.timing.writeDelayMs) {
+      nextUpdateInMs = this.transport.timing.writeDelayMs;
     } else if (blockUntilMs < this.transport.timing.foregroundRefreshMs) {
       this.log.debug('BlockUntilMs too small %d is less than %d', blockUntilMs, this.transport.timing.foregroundRefreshMs);
       blockUntilMs = this.transport.timing.foregroundRefreshMs;
       nextUpdateInMs = this.transport.timing.foregroundRefreshMs;
-    } else if (blockUntilMs === this.transport.timing.writeDelayMs) {
-      nextUpdateInMs = this.transport.timing.writeDelayMs;
     } else {
       nextUpdateInMs = this.transport.timing.backgroundRefreshMs;
     }
@@ -257,12 +269,27 @@ export class DaikinApi {
 
   private async getDevices() {
     const response = await this.transport.listDevices();
-    this._devices = new Map(response.map(d => [d.id, d]));
+    const stableIds = resolveDeviceIds(response, this.knownDevices(), this.log);
+    this._devices = new Map();
+    this._transportIds = new Map();
+    for (const device of response) {
+      const id = stableIds.get(device.id) ?? device.id;
+      this._devices.set(id, { ...device, id });
+      this._transportIds.set(id, device.id);
+    }
     return this._devices;
   }
 
+  private transportId(deviceId: string): string {
+    return this._transportIds.get(deviceId) ?? deviceId;
+  }
+
+  public get capabilities(): TransportCapabilities {
+    return this.transport.capabilities;
+  }
+
   public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
-    return await this.transport.fetchData(deviceId);
+    return await this.transport.fetchData(this.transportId(deviceId));
   }
 
   /**
@@ -646,7 +673,7 @@ export class DaikinApi {
     );
 
     try {
-      if (!(await this.transport.write(deviceId, requestData))) {
+      if (!(await this.transport.write(this.transportId(deviceId), requestData))) {
         this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
         return false;
       }

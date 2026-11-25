@@ -14,11 +14,34 @@ export interface TransportTiming {
 }
 
 /**
+ * Features a transport can read and write. Accessories backed by an unsupported feature aren't loaded.
+ */
+export interface TransportCapabilities {
+  /** Outdoor temperature and humidity. */
+  outdoorSensors: boolean;
+  schedule: boolean;
+  away: boolean;
+  oneClean: boolean;
+  circulateFanSpeed: boolean;
+  targetHumidity: boolean;
+}
+
+export const ALL_CAPABILITIES: TransportCapabilities = {
+  outdoorSensors: true,
+  schedule: true,
+  away: true,
+  oneClean: true,
+  circulateFanSpeed: true,
+  targetHumidity: true,
+};
+
+/**
  * Moves thermostat data between DaikinApi and a Daikin endpoint. Implementations translate their
  * wire format to and from ThermostatData so everything above this layer is transport-agnostic.
  */
 export interface DaikinTransport {
   readonly timing: TransportTiming;
+  readonly capabilities: TransportCapabilities;
   /** Prepares the transport (e.g. authenticates). Returns false if it can't be used. */
   initialize(): Promise<boolean>;
   listDevices(): Promise<Thermostat[]>;

@@ -99,13 +99,17 @@ export class DaikinOnePlusThermostat {
       return this.handleCurrentHumidityGet();
     });
 
-    this.service
-      .getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)
-      .onGet(() => {
-        this.daikinApi.updateNow();
-        return this.handleTargetHumidityGet();
-      })
-      .onSet(this.handleTargetHumiditySet.bind(this));
+    if (this.daikinApi.capabilities.targetHumidity) {
+      this.service
+        .getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)
+        .onGet(() => {
+          this.daikinApi.updateNow();
+          return this.handleTargetHumidityGet();
+        })
+        .onSet(this.handleTargetHumiditySet.bind(this));
+    } else if (this.service.testCharacteristic(this.platform.Characteristic.TargetRelativeHumidity)) {
+      this.service.removeCharacteristic(this.service.getCharacteristic(this.platform.Characteristic.TargetRelativeHumidity));
+    }
 
     this.daikinApi.addListener(this.deviceId, this.updateValues.bind(this));
   }
@@ -140,7 +144,9 @@ export class DaikinOnePlusThermostat {
 
     this.service.updateCharacteristic(this.platform.Characteristic.TemperatureDisplayUnits, this.handleTemperatureDisplayUnitsGet());
     this.service.updateCharacteristic(this.platform.Characteristic.CurrentRelativeHumidity, this.handleCurrentHumidityGet());
-    this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
+    if (this.daikinApi.capabilities.targetHumidity) {
+      this.service.updateCharacteristic(this.platform.Characteristic.TargetRelativeHumidity, this.handleTargetHumidityGet());
+    }
   }
 
   /**

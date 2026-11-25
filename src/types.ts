@@ -8,6 +8,10 @@ export enum ThermostatMode {
   COOL = 2,
   AUTO = 3,
   EMERGENCY_HEAT = 4,
+  /** Local API only, on VRV and split systems. */
+  FAN = 5,
+  /** Local API only, on VRV and split systems. */
+  DRY = 6,
 }
 
 /**
@@ -252,12 +256,29 @@ export interface AccessoryContext {
 }
 
 /**
+ * How the plugin reaches the thermostats: the Daikin cloud API or the thermostats' Local API.
+ */
+export type ConnectionMode = 'cloud' | 'local';
+
+/**
+ * A thermostat reached through the Local API.
+ */
+export interface LocalDeviceConfig {
+  host: string;
+  port: number;
+  /** ID to create or keep accessories under, overriding automatic matching. */
+  deviceId?: string;
+}
+
+/**
  * Plugin configuration options.
  */
 export interface DaikinOptions {
   debug: boolean;
+  connectionMode: ConnectionMode;
   user: string;
   password: string;
+  localDevices: LocalDeviceConfig[];
   includeDeviceName: boolean;
   name: string;
   enableEmergencyHeatSwitch: boolean;

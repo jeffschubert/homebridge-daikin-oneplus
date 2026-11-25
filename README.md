@@ -72,8 +72,12 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
   {
     "platform": "DaikinOnePlus",
     "name": "Daikin One Plus",          // Required. The name of the thermostat. Can be anything.
-    "user": "any@email.address",        // Required. The email of your Daikin One+ account.
-    "password": "password",             // Required.
+    "connectionMode": "cloud",          // 'cloud' (default) or 'local'. See "Cloud or Local mode" below.
+    "user": "any@email.address",        // Required in cloud mode. The email of your Daikin One+ account.
+    "password": "password",             // Required in cloud mode.
+    "localDevices": [                   // Required in local mode. One entry per thermostat.
+      { "host": "192.168.1.52", "port": 80, "deviceId": "" }  // port defaults to 80; deviceId is optional (see below).
+    ],
     "includeDeviceName": false,         // Required. Should the default sensor names start with the thermostat name (as configured in the thermostat).
     "ignoreThermostat": false,          // If true, do not load thermostats found in Daikin account.
     "ignoreIndoorAqi": false,           // If true, do not load indoor air quality sensors of thermostats found in Daikin account.
@@ -101,6 +105,42 @@ The easiest way to configure this plugin is via [Homebridge Config UI X](https:/
   }
 ]
 ```
+
+### Cloud or Local mode
+
+By default the plugin uses the Daikin cloud API through your Daikin account,
+which supports every accessory and feature above.
+
+Local mode talks to each thermostat directly on your network using the
+[Daikin One Local API](https://www.daikinac.com/dakin-one-local-api), so it
+keeps working without the Daikin cloud. To use it:
+
+1. Update the thermostat to the latest firmware, then turn on **Settings >
+   Wi-Fi > Local API** on the thermostat itself (it can't be turned on from
+   the app).
+2. Give the thermostat a fixed IP address, for example with a DHCP
+   reservation on your router.
+3. Set `connectionMode` to `local` and add the thermostat's address to
+   `localDevices`.
+
+The Local API supports less than the cloud API. In local mode you get mode,
+heating/cooling setpoints, display units, indoor temperature and humidity, the
+System State switches, the Emergency Heat switch (where the system supports
+it) and the Circulate Air fan as on/off only. Outdoor temperature and humidity,
+air quality, the Schedule and Away switches, One Clean, fan speed and target
+humidity aren't available, and those accessories are removed in local mode.
+
+Your Daikin login and local thermostat list can both stay in the config, so
+switching modes only means changing `connectionMode`; the other mode's settings
+are ignored. Switching also keeps your existing accessories, along with their
+rooms, scenes and automations. The plugin matches each thermostat to its
+existing accessories by the thermostat's name. If two thermostats share a
+name, set `deviceId` on each local entry to the Serial Number shown for that
+thermostat's existing accessories. Accessories removed in local mode come
+back as new accessories when you switch back to cloud mode.
+
+The Local API has no authentication, so anything on your network can control
+the thermostat once it's turned on.
 
 ### Pushing history to an HTTP endpoint
 
