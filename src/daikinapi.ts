@@ -11,37 +11,9 @@ import {
   ThermostatMode,
 } from './types.js';
 import { HistoryStore } from './historyStore.js';
-
-/**
- * Token response from the Daikin authentication API.
- */
-interface DaikinTokenResponse {
-  accessToken: string;
-  accessTokenExpiresIn: number;
-  refreshToken: string;
-}
+import { DaikinTransport, logError } from './daikinTransport.js';
 
 type DataChanged = () => void;
-
-// After sending an update to the Daikin API it will return old data for up to 15 seconds, so we
-// delay fetching data after an update by this amount. https://daikinone.com/openapi/documentation/
-const DAIKIN_DEVICE_WRITE_DELAY_MS = 15 * 1000;
-
-// User is not interacting with a HomeKit controller - background updates for automations
-const DAIKIN_DEVICE_BACKGROUND_REFRESH_MS = 180 * 1000;
-
-// User is interacting with a HomeKit controller - latest data needed
-const DAIKIN_DEVICE_FOREGROUND_REFRESH_MS = 10 * 1000;
-
-const DAIKIN_API_LOGIN_URL = 'https://api.daikinskyport.com/users/auth/login';
-
-const DAIKIN_API_DEVICES_URL = 'https://api.daikinskyport.com/devices';
-
-const DAIKIN_API_TOKEN_URL = 'https://api.daikinskyport.com/users/auth/token';
-
-const getDeviceUrl = (deviceId: string) => {
-  return `https://api.daikinskyport.com/deviceData/${deviceId}`;
-};
 
 // Model and firmware fields are fixed-width and space-padded. Slots the thermostat can't fill
 // come back empty, as dashes, or as non-printable filler.
@@ -54,8 +26,6 @@ const readIdField = (value: string | undefined): string | undefined => {
 };
 
 export class DaikinApi {
-  private _token: DaikinTokenResponse | undefined;
-  private _tokenExpiration = new Date(0);
   private _devices: Map<string, Thermostat> = new Map(); // cache of all devices (thermostats) and their state
   private _isInitialized = false;
   private _listeners: Map<string, Set<DataChanged>> = new Map();
@@ -70,8 +40,7 @@ export class DaikinApi {
   private _lastReadStartTimeMs = -1;
   private _lastReadFinishTimeMs = -1;
 
-  private user: string;
-  private password: string;
+  private transport: DaikinTransport;
   private log: Logging;
   private logRaw: boolean;
   private historyStore: HistoryStore;
@@ -87,10 +56,9 @@ export class DaikinApi {
   // Devices whose data shape isn't recognized. Warned about once, then skipped.
   private _unsupportedDevices: Set<string> = new Set();
 
-  public constructor(user: string, password: string, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
+  public constructor(transport: DaikinTransport, log: Logging, logRaw: boolean, historyStore: HistoryStore) {
+    this.transport = transport;
     this.log = log;
-    this.user = user;
-    this.password = password;
     this.logRaw = logRaw;
     this.historyStore = historyStore;
   }
@@ -123,10 +91,7 @@ export class DaikinApi {
   }
 
   public async Initialize() {
-    await this.getToken();
-
-    if (!this._token) {
-      this.log.error('Unable to retrieve token.');
+    if (!(await this.transport.initialize())) {
       return;
     }
 
@@ -200,12 +165,12 @@ export class DaikinApi {
    * Schedules the next update. The scheduler has 2 modes.
    *
    * ASAP:    Pull an update as soon as updates are neither blocked by a prior `blockUntilMs` value
-   *          nor by the maximum refresh frequency `DAIKIN_DEVICE_FOREGROUND_REFRESH_MS`.
+   *          nor by the transport's `foregroundRefreshMs`.
    *
-   * Regular: Pull an update every `DAIKIN_DEVICE_BACKGROUND_REFRESH_MS`.
+   * Regular: Pull an update every `backgroundRefreshMs`.
    *
    * @param blockUntilMs If given and > 0 then no updates are guaranteed to take place in the next `blockUntilMs` milliseconds.
-   * @param asap perform update as soon as allowed by DAIKIN_DEVICE_FOREGROUND_REFRESH_MS
+   * @param asap perform update as soon as allowed by `foregroundRefreshMs`
    */
   private _scheduleUpdate(blockUntilMs?: number, asap = false) {
     if (asap) {
@@ -222,7 +187,7 @@ export class DaikinApi {
 
     const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
     const minUntilNextUpdateMs = this._noUpdateBeforeMs - this._monotonic_clock_ms();
-    if (sinceLastUpdateMs > DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
+    if (sinceLastUpdateMs > this.transport.timing.foregroundRefreshMs) {
       if (minUntilNextUpdateMs <= 0) {
         this.log.debug('Instant refresh now');
         this._updateIn(0);
@@ -232,7 +197,7 @@ export class DaikinApi {
       }
     } else {
       const sinceLastUpdateMs = this._monotonic_clock_ms() - this._lastUpdateTimeMs;
-      const updateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS - sinceLastUpdateMs;
+      const updateInMs = this.transport.timing.foregroundRefreshMs - sinceLastUpdateMs;
       this.log.debug('Next allowed poll in %d', updateInMs);
       this._updateIn(Math.max(minUntilNextUpdateMs, updateInMs));
     }
@@ -242,19 +207,19 @@ export class DaikinApi {
     let nextUpdateInMs: number;
     // set how long to wait to do an update (blockUntilMs)
     // and when the next update should happen (nextUpdateInMs)
-    // as of 8/25/23, blockUntilMs will either be undefined or DAIKIN_DEVICE_WRITE_DELAY_MS only
+    // as of 8/25/23, blockUntilMs will either be undefined or writeDelayMs only
     if (!blockUntilMs) {
       // just got data
-      blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
-      nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
-    } else if (blockUntilMs < DAIKIN_DEVICE_FOREGROUND_REFRESH_MS) {
-      this.log.debug('BlockUntilMs too small %d is less than %d', blockUntilMs, DAIKIN_DEVICE_FOREGROUND_REFRESH_MS);
-      blockUntilMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
-      nextUpdateInMs = DAIKIN_DEVICE_FOREGROUND_REFRESH_MS;
-    } else if (blockUntilMs === DAIKIN_DEVICE_WRITE_DELAY_MS) {
-      nextUpdateInMs = DAIKIN_DEVICE_WRITE_DELAY_MS;
+      blockUntilMs = this.transport.timing.foregroundRefreshMs;
+      nextUpdateInMs = this.transport.timing.backgroundRefreshMs;
+    } else if (blockUntilMs < this.transport.timing.foregroundRefreshMs) {
+      this.log.debug('BlockUntilMs too small %d is less than %d', blockUntilMs, this.transport.timing.foregroundRefreshMs);
+      blockUntilMs = this.transport.timing.foregroundRefreshMs;
+      nextUpdateInMs = this.transport.timing.foregroundRefreshMs;
+    } else if (blockUntilMs === this.transport.timing.writeDelayMs) {
+      nextUpdateInMs = this.transport.timing.writeDelayMs;
     } else {
-      nextUpdateInMs = DAIKIN_DEVICE_BACKGROUND_REFRESH_MS;
+      nextUpdateInMs = this.transport.timing.backgroundRefreshMs;
     }
     this._noUpdateBeforeMs = this._monotonic_clock_ms() + blockUntilMs;
 
@@ -290,55 +255,14 @@ export class DaikinApi {
     return Number(hrtime.bigint() / BigInt(1000000));
   }
 
-  private async getToken() {
-    this.log.debug('Getting token...');
-    try {
-      const response = await fetch(DAIKIN_API_LOGIN_URL, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: this.user,
-          password: this.password,
-        }),
-      });
-
-      if (!response.ok) {
-        this.logError(
-          `Request ${DAIKIN_API_LOGIN_URL} failed with status ${response.status} - ${response.statusText}.`,
-          await response.text(),
-        );
-        return;
-      }
-
-      const token: DaikinTokenResponse = await response.json();
-      this.setToken(token);
-    } catch (error) {
-      this.logError('Error getting token:', error);
-    }
-  }
-
-  private setToken(token: DaikinTokenResponse) {
-    this._token = token;
-    this._tokenExpiration = new Date();
-
-    const expSeconds =
-      this._tokenExpiration.getSeconds() + this._token.accessTokenExpiresIn - (DAIKIN_DEVICE_BACKGROUND_REFRESH_MS / 1000) * 2;
-
-    //Set expiration a little early.
-    this._tokenExpiration.setSeconds(expSeconds);
-  }
-
   private async getDevices() {
-    const response: Thermostat[] = (await this.getRequest(DAIKIN_API_DEVICES_URL)) ?? [];
+    const response = await this.transport.listDevices();
     this._devices = new Map(response.map(d => [d.id, d]));
     return this._devices;
   }
 
   public async getDeviceData(deviceId: string): Promise<ThermostatData | undefined> {
-    return await this.getRequest(getDeviceUrl(deviceId));
+    return await this.transport.fetchData(deviceId);
   }
 
   /**
@@ -396,66 +320,6 @@ export class DaikinApi {
       );
     }
     return false;
-  }
-
-  private async refreshToken() {
-    if (typeof this._token === 'undefined' || typeof this._token.refreshToken === 'undefined' || !this._token.refreshToken) {
-      this.log.debug('Cannot refresh token. Getting new token.');
-      return this.getToken();
-    }
-    try {
-      const response = await fetch(DAIKIN_API_TOKEN_URL, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: this.user,
-          refreshToken: this._token.refreshToken,
-        }),
-      });
-
-      if (!response.ok) {
-        this.logError(
-          `Request ${DAIKIN_API_TOKEN_URL} failed with status ${response.status} - ${response.statusText}.`,
-          await response.text(),
-        );
-        return;
-      }
-
-      const token: DaikinTokenResponse = await response.json();
-      this.setToken(token);
-    } catch (error) {
-      this.logError('Error refreshing token:', error);
-    }
-  }
-
-  private async getRequest(uri: string) {
-    if (new Date() >= this._tokenExpiration) {
-      await this.refreshToken();
-    }
-    if (!this._token) {
-      this.log.error('No token for request: %s', uri);
-      return undefined;
-    }
-    try {
-      const response = await fetch(uri, {
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${this._token.accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
-        return undefined;
-      }
-      return response.json();
-    } catch (error) {
-      this.logError(`Error with getRequest: ${uri}`, error);
-      return undefined;
-    }
   }
 
   public getDeviceList(): Thermostat[] {
@@ -781,30 +645,13 @@ export class DaikinApi {
       this._lastReadFinishTimeMs,
     );
 
-    if (!this._token) {
-      this.log.error('No token for write request: %s', deviceId);
-      return false;
-    }
-
     try {
-      const uri = getDeviceUrl(deviceId);
-      const response = await fetch(uri, {
-        method: 'PUT',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this._token.accessToken}`,
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        this.logError(`Request ${uri} failed with status ${response.status} - ${response.statusText}.`, await response.text());
+      if (!(await this.transport.write(deviceId, requestData))) {
         this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
         return false;
       }
 
-      this.log.debug('%s-> device: %s; response: %s', caller, deviceId, JSON.stringify(response.json()));
+      this.log.debug('%s-> device: %s; write accepted', caller, deviceId);
       this._lastWriteFinishTimeMs = this._monotonic_clock_ms();
       this.log.debug(
         'WF: %d ; %d ; GT: %d ; %d',
@@ -814,7 +661,7 @@ export class DaikinApi {
         this._lastReadFinishTimeMs,
       );
       this._updateCache(deviceId, requestData);
-      this._scheduleUpdate(DAIKIN_DEVICE_WRITE_DELAY_MS);
+      this._scheduleUpdate(this.transport.timing.writeDelayMs);
       return true;
     } catch (error) {
       this.logError(`${errorHeader} Device: ${deviceId}:`, error);
@@ -840,8 +687,6 @@ export class DaikinApi {
   }
 
   private logError(message: string, error: unknown): boolean {
-    this.log.error(message);
-    this.log.error(String(error));
-    return false;
+    return logError(this.log, message, error);
   }
 }
