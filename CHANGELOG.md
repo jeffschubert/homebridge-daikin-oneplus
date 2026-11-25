@@ -36,6 +36,9 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 ### Fixed
 - The thermostat shows as cooling, not idle, while the system overcools to
   dehumidify (#86).
+- The outdoor temperature sensor keeps its last reading when Daikin reports
+  no outdoor temperature (255), instead of triggering an illegal-value
+  warning (#32).
 
 ## 4.2.0 — 2026-09-24
 
