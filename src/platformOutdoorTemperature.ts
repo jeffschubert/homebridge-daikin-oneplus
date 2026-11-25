@@ -38,7 +38,13 @@ export class DaikinOnePlusOutdoorTemperature {
   }
 
   private handleTemperatureGet(): CharacteristicValue {
+    const characteristic = this.service.getCharacteristic(this.platform.Characteristic.CurrentTemperature);
     const currentOutdoorTemp = this.daikinApi.getOutdoorTemp(this.deviceId);
+    // Daikin reports 255 when it has no outdoor reading; keep showing the last valid value instead.
+    if (currentOutdoorTemp < (characteristic.props.minValue ?? -270) || currentOutdoorTemp > (characteristic.props.maxValue ?? 100)) {
+      this.platform.log.debug('%s - Ignoring out-of-range Outdoor Temperature: %d', this.accessory.displayName, currentOutdoorTemp);
+      return characteristic.value ?? 0;
+    }
     this.platform.log.debug('%s - Get Outdoor Temperature: %d', this.accessory.displayName, currentOutdoorTemp);
     return currentOutdoorTemp;
   }
