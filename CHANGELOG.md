@@ -33,6 +33,10 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   succeed until the next refresh, and automations see it as failed (#85). A
   failed mode change no longer leaves the new mode showing.
 
+### Fixed
+- The thermostat shows as cooling, not idle, while the system overcools to
+  dehumidify (#86).
+
 ## 4.2.0 — 2026-09-24
 
 ### Added
